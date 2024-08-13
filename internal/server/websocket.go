@@ -50,8 +50,8 @@ func (s *Server) WebsocketSubscribeHandler(w http.ResponseWriter, r *http.Reques
 
 	for range cap(errChan) {
 		if err = <-errChan; err != nil {
-			if websocket.CloseStatus(errors.Unwrap(err)) == websocket.StatusNormalClosure ||
-				websocket.CloseStatus(errors.Unwrap(err)) == websocket.StatusGoingAway {
+			if websocket.CloseStatus(err) == websocket.StatusNormalClosure ||
+				websocket.CloseStatus(err) == websocket.StatusGoingAway {
 				return
 			}
 			slog.Error(err.Error())
@@ -107,7 +107,7 @@ func (s *Server) handleSentMessages(shutdownCtx, reqCtx context.Context, conn *w
 		var ms domain.MessageSent
 		if err := wsjson.Read(reqCtx, conn, &ms); err != nil {
 			s.wsInvalidJsonResponse(conn)
-			return err
+			return errors.Unwrap(err)
 		}
 		// ProcessSentMessage populate the domain.Message and also concurrently persist it to DB with 5 retries
 		msg, ev := s.Facade.ProcessSentMessage(reqCtx, ms)
