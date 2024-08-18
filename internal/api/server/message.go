@@ -1,7 +1,7 @@
 package server
 
 import (
-	"github.com/M0hammadUsman/letschat/internal/common"
+	"github.com/M0hammadUsman/letschat/internal/api/common"
 	"github.com/M0hammadUsman/letschat/internal/domain"
 	"net/http"
 )

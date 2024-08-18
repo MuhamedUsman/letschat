@@ -2,7 +2,7 @@ package repository
 
 import (
 	"context"
-	"github.com/M0hammadUsman/letschat/internal/common"
+	"github.com/M0hammadUsman/letschat/internal/api/common"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
 	"time"

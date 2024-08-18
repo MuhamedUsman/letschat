@@ -1,20 +1,20 @@
 package main
 
 import (
-	"github.com/M0hammadUsman/letschat/internal/common"
-	"github.com/M0hammadUsman/letschat/internal/facade"
-	"github.com/M0hammadUsman/letschat/internal/mailer"
-	"github.com/M0hammadUsman/letschat/internal/repository"
-	"github.com/M0hammadUsman/letschat/internal/server"
-	"github.com/M0hammadUsman/letschat/internal/service"
+	common2 "github.com/M0hammadUsman/letschat/internal/api/common"
+	"github.com/M0hammadUsman/letschat/internal/api/facade"
+	"github.com/M0hammadUsman/letschat/internal/api/mailer"
+	"github.com/M0hammadUsman/letschat/internal/api/repository"
+	"github.com/M0hammadUsman/letschat/internal/api/server"
+	"github.com/M0hammadUsman/letschat/internal/api/service"
 )
 
 func main() {
-	common.ConfigureSlog()
-	cfg := common.ParseFlags()
+	common2.ConfigureSlog()
+	cfg := common2.ParseFlags()
 	// Base
 	db := repository.OpenDB(cfg)
-	bgTask := common.NewBackgroundTask()
+	bgTask := common2.NewBackgroundTask()
 	mailr := mailer.New(cfg)
 	// Repositories
 	userRepo := repository.NewUserRepository(db)
