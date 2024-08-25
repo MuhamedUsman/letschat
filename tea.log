@@ -1,8 +1,11 @@
-log 2024/08/15 08:50:43 43
-log 2024/08/15 08:50:43 157
-log 2024/08/15 08:50:43 43
-log 2024/08/15 08:50:43 157
-log 2024/08/15 08:51:28 35
-log 2024/08/15 08:51:28 145
-log 2024/08/15 08:51:28 35
-log 2024/08/15 08:51:28 145
+log 2024/08/26 01:32:08 422 Unprocessable Entity
+log 2024/08/26 01:32:08 &{Status:422 Unprocessable Entity StatusCode:422 Proto:HTTP/1.1 ProtoMajor:1 ProtoMinor:1 Header:map[Content-Length:[47] Content-Type:[application/json] Date:[Sun, 25 Aug 2024 20:32:08 GMT] Vary:[Authorization]] Body:0xc0001f6080 ContentLength:47 TransferEncoding:[] Close:false Uncompressed:false Trailer:map[] Request:0xc0000a2000 TLS:<nil>}
+log 2024/08/26 01:32:08 {OTP:}
+log 2024/08/26 01:34:20 422 Unprocessable Entity
+log 2024/08/26 01:34:20 &{Status:422 Unprocessable Entity StatusCode:422 Proto:HTTP/1.1 ProtoMajor:1 ProtoMinor:1 Header:map[Content-Length:[47] Content-Type:[application/json] Date:[Sun, 25 Aug 2024 20:34:20 GMT] Vary:[Authorization]] Body:0xc0003f6080 ContentLength:47 TransferEncoding:[] Close:false Uncompressed:false Trailer:map[] Request:0xc0000a2000 TLS:<nil>}
+log 2024/08/26 01:34:20 {OTP:}
+log 2024/08/26 01:37:19 Post "http://localhost:8080/v1/users/activate": EOF
+log 2024/08/26 03:29:36 Post "http://localhost:8080/v1/tokens/otp": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.
+log 2024/08/26 03:29:44 Post "http://localhost:8080/v1/tokens/otp": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.
+log 2024/08/26 03:29:51 Post "http://localhost:8080/v1/tokens/otp": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.
+log 2024/08/26 03:30:00 Post "http://localhost:8080/v1/tokens/otp": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.

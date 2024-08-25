@@ -6,8 +6,6 @@ import (
 	"net/http"
 )
 
-// HTTP ----------------------------------------------------------------------------------------------------------------
-
 func (s *Server) RegisterUserHandler(w http.ResponseWriter, r *http.Request) {
 	var userRegister domain.UserRegister
 	if err := s.readJSON(w, r, &userRegister); err != nil {

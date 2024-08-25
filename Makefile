@@ -37,3 +37,9 @@ run/live:
 compose/run:
 	@read -p "Input command with flags: " command; \
 	docker compose -f compose-dev.yml $$command
+
+## build/debug: build with specific flags that allows delve debugging on remote port
+.PHONY: build/debug
+build/debug:
+	go build -gcflags "all=-N -l" -o ./bin ./cmd/letschat; \
+	dlv --listen=:2345 --headless=true --api-version=2 --accept-multiclient exec ./bin/letschat.exe

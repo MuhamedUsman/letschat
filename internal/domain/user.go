@@ -78,7 +78,7 @@ func ValidateName(name string, ev *ErrValidation) {
 func ValidateEmail(email string, ev *ErrValidation) {
 	ev.Evaluate(email != "", "email", "must be provided")
 	if len(email) > 254 || !RgxEmail.MatchString(email) {
-		ev.AddError("email", "must be a valid")
+		ev.AddError("email", "must be valid")
 	}
 }
 

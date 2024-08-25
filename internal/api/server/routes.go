@@ -14,7 +14,7 @@ func (s *Server) routes() http.Handler {
 	// User Routes
 	mux.HandleFunc("POST /v1/users", s.RegisterUserHandler)
 	mux.Handle("GET /v1/users/{field}", authenticated.ThenFunc(s.GetByUniqueFieldHandler))
-	mux.Handle("POST /v1/users/update", activated.ThenFunc(s.UpdateUserHandler))
+	mux.Handle("PUT /v1/users", activated.ThenFunc(s.UpdateUserHandler))
 	mux.HandleFunc("POST /v1/users/activate", s.ActivateUserHandler)
 	// Token Routes
 	mux.HandleFunc("POST /v1/tokens/otp", s.GenerateOTPHandler)
