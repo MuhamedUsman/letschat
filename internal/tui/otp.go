@@ -12,11 +12,12 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/reflow/wordwrap"
 	"github.com/muesli/reflow/wrap"
+	"golang.org/x/exp/maps"
 	"strings"
 	"time"
 )
 
-const timeout = 5 * time.Second
+const timeout = 15 * time.Second
 
 var (
 	otpInputStyle = lipgloss.NewStyle().
@@ -190,7 +191,7 @@ func (m *OtpModel) populateErr(err string) {
 	m.otp.Placeholder = err
 	m.otp.PlaceholderStyle = lipgloss.NewStyle().Foreground(secondaryColor)
 	m.dangerState = true
-	m.ev = domain.NewErrValidation() // so we don't have errors when calling ev.HasErrors() next time
+	maps.Clear(m.ev.Errors)
 }
 
 func (m OtpModel) activateUser() tea.Cmd {

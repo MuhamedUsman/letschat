@@ -11,8 +11,6 @@ import (
 	"strings"
 )
 
-const serverDownErr = "No connection could be made because the target machine actively refused it."
-
 // Register will register the user & populate the *domain.UserRegister with validation errors
 // in case of http.StatusUnprocessableEntity
 func (*Client) Register(u *domain.UserRegister) error {
@@ -24,8 +22,8 @@ func (*Client) Register(u *domain.UserRegister) error {
 	resp, err := http.DefaultClient.Post(registerUser, "application/json", bytes.NewBuffer(body))
 	if err != nil {
 		log.Println(err.Error())
-		if strings.Contains(err.Error(), serverDownErr) {
-			return errors.New(serverDownErr)
+		if strings.Contains(strings.ToLower(err.Error()), ErrServerDown.Error()) {
+			return ErrServerDown
 		}
 		return err
 	}
@@ -52,30 +50,49 @@ func (*Client) Register(u *domain.UserRegister) error {
 	return nil
 }
 
-func (c *Client) Login(email, password string) error {
-	data := domain.UserAuth{
-		Email:    email,
-		Password: password,
-	}
-	b, err := json.Marshal(data)
+func (c *Client) Login(u domain.UserAuth) error {
+	b, err := json.Marshal(u)
 	if err != nil {
 		log.Println(err.Error())
 		return err
 	}
 	res, err := http.DefaultClient.Post(authenticate, "application/json", bytes.NewBuffer(b))
 	if err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), ErrServerDown.Error()) {
+			return ErrServerDown
+		}
 		log.Println(err.Error())
 		return err
 	}
 	defer res.Body.Close()
-	var resBody []byte
-	if _, err = res.Body.Read(resBody); err != nil {
+	readBody, err := io.ReadAll(res.Body)
+	if err != nil {
 		log.Println(err.Error())
 		return err
 	}
-	if err = json.Unmarshal(resBody, &c.AuthToken); err != nil {
-		log.Println(err.Error())
-		return err
+	if res.StatusCode == http.StatusOK {
+		var token struct {
+			Token string `json:"token"`
+		}
+		if err = json.Unmarshal(readBody, &token); err != nil {
+			log.Println(err.Error())
+			return err
+		}
+		log.Println("authToken", c.AuthToken, "api token", token.Token)
+		c.AuthToken = token.Token
+	} else {
+		var ev struct {
+			Errors *domain.UserAuth `json:"errors"`
+		}
+		if err = json.Unmarshal(readBody, &ev); err != nil {
+			log.Println(err.Error())
+			return err
+		}
+		if ev.Errors.Email == ErrNonActiveUser.Error() {
+			return ErrNonActiveUser
+		} else {
+			return ErrUnauthorized
+		}
 	}
 	// putting auth token in keyring
 	if err = c.krm.setAuthTokenInKeyring(c.AuthToken); err != nil {
@@ -98,8 +115,8 @@ func (c *Client) ActivateUser(otp string) error {
 	res, err := http.Post(activateUser, "application/json", bytes.NewBuffer(jsonBytes))
 	if err != nil {
 		log.Println(err.Error())
-		if strings.Contains(err.Error(), serverDownErr) {
-			return errors.New(serverDownErr)
+		if strings.Contains(strings.ToLower(err.Error()), ErrServerDown.Error()) {
+			return ErrServerDown
 		}
 		return err
 	}

@@ -23,7 +23,7 @@ type UserRegisterModel struct {
 	activeBtn    int // -1 -> none, 0 -> Continue 1 -> Login
 	tabIdx       int // 0 - 2 -> txtInputs | 3 - 4 -> Continue & Login btns
 	dangerState  bool
-	errMsg       string
+	errMsg       errMsg
 	ev           *domain.ErrValidation
 	client       *client.Client
 }
@@ -42,6 +42,7 @@ func InitialUserRegisterModel() UserRegisterModel {
 			"How should we contact you, probably your email",
 			"How should we authenticate you, most probably your ex's name",
 		},
+		client: client.Get(),
 	}
 
 	for i := range m.txtInputs {
@@ -72,7 +73,6 @@ func InitialUserRegisterModel() UserRegisterModel {
 }
 
 func (m UserRegisterModel) Init() tea.Cmd {
-	m.client = client.Get()
 	return textinput.Blink
 }
 
@@ -154,7 +154,7 @@ func (m UserRegisterModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case errMsg:
-		m.errMsg = string(msg)
+		m.errMsg = msg
 		m.dangerState = true
 		m.spin = false
 
@@ -195,7 +195,7 @@ func (m UserRegisterModel) View() string {
 	var sb strings.Builder
 	sb.WriteString(letschatLogo)
 	if m.errMsg != "" && m.dangerState {
-		e := wrap.String(wordwrap.String(m.errMsg, 60), 60)
+		e := wrap.String(wordwrap.String(m.errMsg.String(), 60), 60)
 		sb.WriteString(infoTxtStyle.Foreground(secondaryColor).Render(e))
 	} else {
 		sb.WriteString(infoTxtStyle.Render("Signup for a new account"))
