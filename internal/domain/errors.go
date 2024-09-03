@@ -19,7 +19,7 @@ func NewErrValidation() *ErrValidation {
 }
 
 // implements error interface, so unwrap the error to get the validation errors
-func (*ErrValidation) Error() string {
+func (ErrValidation) Error() string {
 	return "validation error"
 }
 

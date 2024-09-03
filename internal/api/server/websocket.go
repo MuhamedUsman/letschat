@@ -29,10 +29,26 @@ func (s *Server) WebsocketSubscribeHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	defer conn.CloseNow()
-
 	u := common.ContextGetUser(r.Context())
+
 	s.addSubscriber(u)
-	defer s.removeSubscriber(u)
+	if err = s.Facade.UpdateUserOnlineStatus(r.Context(), u, true); err != nil {
+		s.editConflictResponse(w, r)
+		return
+	}
+	if err = s.broadcastUserOnlineStatus(r.Context(), u, true); err != nil {
+		s.serverErrorResponse(w, r, err)
+		return
+	}
+	defer func() {
+		for range 5 { // Very unlikely to fail
+			if err = s.Facade.UpdateUserOnlineStatus(r.Context(), u, false); err == nil { // successful case
+				break
+			}
+		}
+		s.broadcastUserOnlineStatus(r.Context(), u, false)
+		s.removeSubscriber(u)
+	}()
 
 	// retrieving unread messages if any
 	if err = s.Facade.WriteUnreadMessagesToWSConn(r.Context(), u.Messages); err != nil {
@@ -86,14 +102,16 @@ func (s *Server) subscribe(w http.ResponseWriter, r *http.Request) (*websocket.C
 	return conn, nil
 }
 
-func (*Server) handleReceivedMessages(shutdownCtx, reqCtx context.Context, conn *websocket.Conn) error {
+func (s *Server) handleReceivedMessages(shutdownCtx, reqCtx context.Context, conn *websocket.Conn) error {
 	u := common.ContextGetUser(reqCtx)
 	// Listening for messages for this user
 	for {
 		select {
 		case msg := <-u.Messages:
-			if err := writeWithTimeout(conn, 5*time.Second, msg); err != nil {
-				return err
+			if s.publishLimiter.Allow() {
+				if err := writeWithTimeout(conn, 5*time.Second, msg); err != nil {
+					return err
+				}
 			}
 		case <-shutdownCtx.Done():
 			return nil
@@ -110,9 +128,13 @@ func (s *Server) handleSentMessages(shutdownCtx, reqCtx context.Context, conn *w
 			return errors.Unwrap(err)
 		}
 		// ProcessSentMessage populate the domain.Message and also concurrently persist it to DB with 5 retries
-		msg, ev := s.Facade.ProcessSentMessage(reqCtx, ms)
-		if ev != nil {
-			handleValidationError(conn, ev)
+		msg, err := s.Facade.ProcessSentMessage(reqCtx, ms, u)
+		if err != nil {
+			if errors.Is(err, domain.ErrValidation{}) {
+				handleValidationError(conn, err)
+			} else {
+				return err
+			}
 			continue
 		}
 		if relayTo, ok := s.Subscribers[ms.ReceiverID]; ok {
@@ -138,6 +160,34 @@ func (s *Server) removeSubscriber(u *domain.User) {
 	s.SubsMu.Lock()
 	delete(s.Subscribers, u.ID)
 	s.SubsMu.Unlock()
+}
+
+func (s *Server) broadcastUserOnlineStatus(ctx context.Context, u *domain.User, online bool) error {
+	convos, err := s.Facade.GetConversations(ctx)
+	if err != nil {
+		return err
+	}
+	for _, convo := range convos {
+		if convo.LastOnline != nil { // meaning the user is not online
+			continue
+		}
+		targetUserID := convo.ReceiverID
+		if targetUserID == u.ID {
+			targetUserID = convo.SenderID
+		}
+		t := time.Now()
+		op := domain.UserOfflineMsg
+		if online {
+			op = domain.UserOnlineMsg
+		}
+		msg := domain.Message{
+			SenderID:  u.ID,
+			SentAt:    &t,
+			Operation: op,
+		}
+		s.Subscribers[targetUserID].Messages <- &msg
+	}
+	return nil
 }
 
 func writeWithTimeout(conn *websocket.Conn, t time.Duration, msg any) error {

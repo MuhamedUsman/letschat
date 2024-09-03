@@ -62,6 +62,10 @@ func (f *UserFacade) UpdateUser(ctx context.Context, u *domain.UserUpdate) error
 	return f.service.UpdateUser(ctx, u)
 }
 
+func (f *UserFacade) UpdateUserOnlineStatus(ctx context.Context, u *domain.User, online bool) error {
+	return f.service.UpdateUserOnlineStatus(ctx, u, online)
+}
+
 func (f *UserFacade) ActivateUser(ctx context.Context, plainToken string) error {
 	return f.txManager.RunInTX(ctx, func(ctx context.Context) error {
 		usr, err := f.service.GetForToken(ctx, domain.ScopeActivation, plainToken)
@@ -73,4 +77,12 @@ func (f *UserFacade) ActivateUser(ctx context.Context, plainToken string) error 
 		}
 		return f.service.DeleteAllForUser(ctx, usr.ID, domain.ScopeActivation)
 	})
+}
+
+func (f *UserFacade) SearchUser(
+	ctx context.Context,
+	queryParam string,
+	filter domain.Filter,
+) ([]*domain.User, *domain.Metadata, error) {
+	return f.service.GetByQuery(ctx, queryParam, filter)
 }

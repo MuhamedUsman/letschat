@@ -16,11 +16,7 @@ func NewMessageService(messageRepo domain.MessageRepository) *MessageService {
 	return &MessageService{messageRepo}
 }
 
-func (*MessageService) PopulateMessage(ctx context.Context, m domain.MessageSent) *domain.Message {
-	sndr := common.ContextGetUser(ctx)
-	if sndr == nil {
-		panic("no sender was found in the context, Hint: missing Authentication middleware")
-	}
+func (*MessageService) PopulateMessage(m domain.MessageSent, sndr *domain.User) *domain.Message {
 	msg := &domain.Message{
 		SenderID:    sndr.ID,
 		ReceiverID:  m.ReceiverID,
@@ -48,6 +44,10 @@ func (s *MessageService) ProcessSentMessages(ctx context.Context, m *domain.Mess
 		return s.messageRepo.UpdateMessage(ctx, m)
 	case domain.DeleteMsg:
 		return s.messageRepo.DeleteMessage(ctx, m.ID)
+	case domain.UserOnlineMsg:
+		return nil
+	case domain.UserOfflineMsg:
+		return nil
 	default:
 		return errors.New("invalid message operation")
 	}

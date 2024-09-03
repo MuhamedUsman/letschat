@@ -9,8 +9,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/muesli/reflow/wordwrap"
-	"github.com/muesli/reflow/wrap"
+	"github.com/charmbracelet/x/ansi"
 	"golang.org/x/exp/maps"
 	"strings"
 )
@@ -85,9 +84,9 @@ func (m UserRegisterModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		m.handleActiveTabIdxElement()
-		// must be after handling the active tab indices method
+		// must be after handling the activeTab tab indices method
 		m.dangerState = false // once there is a keypress remove the danger state
-		m.errMsg = ""
+		m.errMsg.err = ""
 		switch msg.String() {
 
 		case "ctrl+c", "q":
@@ -105,7 +104,8 @@ func (m UserRegisterModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, nil
 				}
 			} else if m.tabIdx == 4 {
-				return InitialLoginModel(), nil
+				loginModel := InitialLoginModel()
+				return loginModel, loginModel.Init()
 			} else {
 				m.tabIdx++
 				if m.tabIdx == 3 {
@@ -113,43 +113,37 @@ func (m UserRegisterModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 
-		case "tab", "shift+tab":
-			s := msg.String()
-
-			if s == "tab" {
-				if m.tabIdx == 4 {
-					m.tabIdx = 0
-				} else {
-					m.tabIdx++
-				}
+		case "tab":
+			if m.tabIdx == 4 {
+				m.tabIdx = 0
+			} else {
+				m.tabIdx++
 			}
-			if s == "shift+tab" {
-				if m.tabIdx == 0 {
-					m.tabIdx = 4
-				} else {
-					m.tabIdx--
-				}
-			}
-
-			{ // Updating btns
-				if m.tabIdx == 3 {
-					m.activeBtn = 0
-				} else if m.tabIdx == 4 {
-					m.activeBtn = 1
-				} else {
-					m.activeBtn = -1
-				}
-			}
-
-		case "left":
-			if m.tabIdx > len(m.txtInputs) {
-				m.activeBtn = 0
+		case "shift+tab":
+			if m.tabIdx == 0 {
+				m.tabIdx = 4
+			} else {
 				m.tabIdx--
 			}
 		case "right":
-			if m.tabIdx >= len(m.txtInputs) {
+			if m.tabIdx == 3 {
 				m.activeBtn = 1
 				m.tabIdx++
+			}
+		case "left":
+			if m.tabIdx == 4 {
+				m.activeBtn = 0
+				m.tabIdx--
+			}
+		}
+
+		{ // Updating btns
+			if m.tabIdx == 3 {
+				m.activeBtn = 0
+			} else if m.tabIdx == 4 {
+				m.activeBtn = 1
+			} else {
+				m.activeBtn = -1
 			}
 		}
 
@@ -194,9 +188,9 @@ func (m UserRegisterModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m UserRegisterModel) View() string {
 	var sb strings.Builder
 	sb.WriteString(letschatLogo)
-	if m.errMsg != "" && m.dangerState {
-		e := wrap.String(wordwrap.String(m.errMsg.String(), 60), 60)
-		sb.WriteString(infoTxtStyle.Foreground(secondaryColor).Render(e))
+	if m.errMsg.err != "" && m.dangerState {
+		e := ansi.Wordwrap(m.errMsg.String(), 60, " ")
+		sb.WriteString(infoTxtStyle.Foreground(dangerColor).Render(e))
 	} else {
 		sb.WriteString(infoTxtStyle.Render("Signup for a new account"))
 	}
@@ -221,20 +215,20 @@ func (m UserRegisterModel) View() string {
 			} else {
 				continueBtnTxt = "Continue"
 			}
-			continueBtn = activeButtonStyleWithColor(whiteColor, primaryColor).Render(continueBtnTxt)
+			continueBtn = activeButtonStyleWithColor(primaryContrastColor, primaryColor).Render(continueBtnTxt)
 			sb.WriteString(activeBtnInputStyle.Render(continueBtn, loginBtn))
 		} else if m.activeBtn == 1 {
-			loginBtn = activeButtonStyleWithColor(whiteColor, primaryColor).Render("Login↗")
+			loginBtn = activeButtonStyleWithColor(primaryContrastColor, primaryColor).Render("Login↗")
 			sb.WriteString(activeBtnInputStyle.Render(continueBtn, loginBtn))
 		}
 	} else {
 		sb.WriteString(btnInputStyle.Render(continueBtn, loginBtn))
 	}
-	c := container
+	c := formContainer
 	if m.dangerState {
-		c = c.BorderForeground(secondaryColor)
+		c = c.BorderForeground(dangerColor)
 	}
-	return containerCentered(c.Render(sb.String()))
+	return formContainerCentered(c.Render(sb.String()))
 }
 
 // Helpers & Stuff -----------------------------------------------------------------------------------------------------
@@ -267,7 +261,7 @@ func (m *UserRegisterModel) validateUserRegisterModel() error {
 func (m *UserRegisterModel) populateErr(idx int, err string) {
 	m.txtInputs[idx].Reset()
 	m.txtInputs[idx].Placeholder = err
-	m.txtInputs[idx].PlaceholderStyle = lipgloss.NewStyle().Foreground(secondaryColor)
+	m.txtInputs[idx].PlaceholderStyle = lipgloss.NewStyle().Foreground(dangerColor)
 	m.spin = false
 }
 
@@ -275,8 +269,6 @@ func (m *UserRegisterModel) handleActiveTabIdxElement() {
 	for i := range m.txtInputs {
 		if i == m.tabIdx {
 			m.txtInputs[i].Focus()
-			m.txtInputs[i].Cursor.Focus()
-			m.txtInputs[i].Cursor.BlinkCmd()
 		} else {
 			m.txtInputs[i].Blur()
 		}
@@ -305,7 +297,7 @@ func (m *UserRegisterModel) registerUser() tea.Cmd {
 			if errors.Is(err, client.ErrServerValidation) {
 				return u
 			}
-			return errMsg(err.Error())
+			return errMsg{err: err.Error()}
 		}
 		return doneMsg{}
 	}

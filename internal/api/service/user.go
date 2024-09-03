@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 	"strings"
+	"time"
 )
 
 // ensures UserService implements letschat.UserService interface
@@ -111,6 +112,20 @@ func (s *UserService) UpdateUser(ctx context.Context, u *domain.UserUpdate) erro
 	return nil
 }
 
+func (s *UserService) UpdateUserOnlineStatus(ctx context.Context, usr *domain.User, online bool) error {
+	u, err := s.userRepository.GetByUniqueField(ctx, "id", usr.ID)
+	if err != nil {
+		return err
+	}
+	var lastOnline *time.Time
+	if !online {
+		now := time.Now()
+		lastOnline = &now
+	}
+	u.LastOnline = lastOnline
+	return s.userRepository.UpdateUser(ctx, u)
+}
+
 func (s *UserService) GetForToken(ctx context.Context, scope string, plainToken string) (*domain.User, error) {
 	ev := domain.NewErrValidation()
 	switch scope {
@@ -169,6 +184,20 @@ func (s *UserService) AuthenticateUser(ctx context.Context, u *domain.UserAuth) 
 		return "", ev
 	}
 	return usr.ID, nil
+}
+
+func (s *UserService) GetByQuery(
+	ctx context.Context,
+	queryParam string,
+	filter domain.Filter,
+) ([]*domain.User, *domain.Metadata, error) {
+	var paramName string // name or email
+	if strings.Contains(queryParam, "@") {
+		paramName = "email"
+	} else {
+		paramName = "name"
+	}
+	return s.userRepository.GetByQuery(ctx, paramName, queryParam, filter)
 }
 
 func generatePasswordHash(plainPassword string) ([]byte, error) {

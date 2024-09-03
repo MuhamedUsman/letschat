@@ -5,8 +5,9 @@ import (
 )
 
 var (
-	serviceName = "auth-token"
-	tokenKey    = "letschat-auth-token"
+	appName     = "Letschat"
+	serviceName = " Auth"
+	tokenKey    = " Access Token"
 )
 
 type keyringManager struct {
@@ -14,20 +15,26 @@ type keyringManager struct {
 }
 
 func newKeyringManager() (*keyringManager, error) {
-	kr, err := keyring.Open(keyring.Config{ServiceName: serviceName})
+	cfg := keyring.Config{
+		ServiceName:             serviceName,
+		KeyCtlScope:             "user",
+		LibSecretCollectionName: appName,
+		WinCredPrefix:           appName,
+	}
+	kr, err := keyring.Open(cfg)
 	if err != nil {
 		return nil, err
 	}
 	return &keyringManager{kr: kr}, nil
 }
 
-func (k *keyringManager) setAuthTokenInKeyring(data string) error {
+func (k *keyringManager) setAuthTokenInKeyring(label, data string) error {
 	item := keyring.Item{
 		Key:         tokenKey,
 		Data:        []byte(data),
-		Label:       serviceName,
 		Description: "auth token to validate user after basic login",
 	}
+	item.Label = "user=" + label
 	return k.kr.Set(item)
 }
 

@@ -68,7 +68,7 @@ func (r *MessageRepository) GetMessagesAsPage(
 	filter *domain.Filter,
 ) (*domain.Metadata, error) {
 	query := `
-		SELECT COUNT(*) OVER() total_rows, id, sender_id, receiver_id, body, sent_at, delivered_at, read_at
+		SELECT COUNT(*) OVER() total_rows, *
 		FROM message
 		WHERE receiver_id = $1
 		ORDER BY sent_at DESC

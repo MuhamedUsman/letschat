@@ -12,7 +12,8 @@ const (
 	CreateMsg MessageOperation = iota
 	UpdateMsg
 	DeleteMsg
-	GetMoreMsg // Only sent through sub endpoint to get more messages
+	UserOnlineMsg
+	UserOfflineMsg
 )
 
 var (
@@ -20,7 +21,7 @@ var (
 )
 
 type Message struct {
-	ID          string           `json:"id"`
+	ID          string           `json:"id,omitempty"`
 	SenderID    string           `json:"senderID,omitempty"    db:"sender_id"`
 	ReceiverID  string           `json:"receiverID,omitempty"  db:"receiver_id"`
 	Body        string           `json:"body,omitempty"`
@@ -34,7 +35,7 @@ type Message struct {
 type MsgChan chan *Message
 
 type MessageService interface {
-	PopulateMessage(ctx context.Context, m MessageSent) *Message
+	PopulateMessage(m MessageSent, sndr *User) *Message
 	ProcessSentMessages(ctx context.Context, m *Message) error
 	GetUnreadMessages(ctx context.Context, c MsgChan) error
 	GetMessagesAsPage(ctx context.Context, c MsgChan, filter *Filter) (*Metadata, error)

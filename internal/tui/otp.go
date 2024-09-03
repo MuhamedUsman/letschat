@@ -10,24 +10,13 @@ import (
 	"github.com/charmbracelet/bubbles/timer"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/muesli/reflow/wordwrap"
-	"github.com/muesli/reflow/wrap"
+	"github.com/charmbracelet/x/ansi"
 	"golang.org/x/exp/maps"
 	"strings"
 	"time"
 )
 
 const timeout = 15 * time.Second
-
-var (
-	otpInputStyle = lipgloss.NewStyle().
-		Border(lipgloss.ThickBorder(), false, false, true, false).
-		BorderForeground(greyColor).
-		Padding(0, 1, 0, 1).
-		Margin(1, 0, 1, 0).
-		Width(10).
-		Align(lipgloss.Center)
-)
 
 type OtpModel struct {
 	otp         textinput.Model
@@ -47,7 +36,7 @@ func InitialOTPModel(email string) OtpModel {
 	i.CharLimit = 6
 	i.Prompt = ""
 	i.Placeholder = "$$$$$$"
-	i.PlaceholderStyle = lipgloss.NewStyle().Foreground(greyColor)
+	i.PlaceholderStyle = lipgloss.NewStyle().Foreground(darkGreyColor)
 	i.TextStyle = lipgloss.NewStyle().Foreground(primaryColor)
 	i.Focus()
 	i.Cursor = cursor.New()
@@ -76,8 +65,8 @@ func (m OtpModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		m.dangerState = false // reset the dangerState once there is a key press
 		m.otp.Placeholder = m.placeholder
-		m.errMsg = ""
-		m.otp.PlaceholderStyle = lipgloss.NewStyle().Foreground(greyColor)
+		m.errMsg.err = ""
+		m.otp.PlaceholderStyle = lipgloss.NewStyle().Foreground(darkGreyColor)
 		switch msg.String() {
 		case "ctrl+c", "q":
 			return m, tea.Quit
@@ -120,7 +109,7 @@ func (m OtpModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 
 	case errMsg:
-		if msg == "Expired!" {
+		if msg.err == "Expired!" {
 			m.populateErr(msg.String())
 		} else {
 			m.errMsg = msg
@@ -130,7 +119,8 @@ func (m OtpModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case doneMsg:
-		return InitialLoginModel(), nil
+		loginModel := InitialLoginModel()
+		return loginModel, loginModel.Init()
 	}
 
 	var cmd tea.Cmd
@@ -141,15 +131,15 @@ func (m OtpModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m OtpModel) View() string {
 	var sb strings.Builder
 	sb.WriteString(letschatLogo)
-	c := container
+	c := formContainer
 	otpStyle := otpInputStyle
 
-	if m.dangerState && m.errMsg != "" {
-		c = c.BorderForeground(secondaryColor)
-		otpStyle = otpInputStyle.BorderForeground(secondaryColor)
-		m.otp.TextStyle = m.otp.TextStyle.Foreground(secondaryColor)
-		e := wrap.String(wordwrap.String(m.errMsg.String(), 60), 60)
-		sb.WriteString(infoTxtStyle.Foreground(secondaryColor).Render(e))
+	if m.dangerState && m.errMsg.err != "" {
+		c = c.BorderForeground(dangerColor)
+		otpStyle = otpInputStyle.BorderForeground(dangerColor)
+		m.otp.TextStyle = m.otp.TextStyle.Foreground(dangerColor)
+		e := ansi.Wordwrap(m.errMsg.String(), 60, " ")
+		sb.WriteString(infoTxtStyle.Foreground(dangerColor).Render(e))
 	} else {
 		sb.WriteString(infoTxtStyle.Render("We've sent you some random digits, paste them here & hit enter"))
 	}
@@ -161,9 +151,9 @@ func (m OtpModel) View() string {
 	btnStyle := buttonStyle
 	if m.tabIdx == 1 {
 		if m.timer.Timedout() {
-			btnStyle = buttonStyle.Background(primaryColor).Foreground(whiteColor)
+			btnStyle = buttonStyle.Background(primaryColor).Foreground(primaryContrastColor)
 		} else {
-			btnStyle = btnStyle.Background(secondaryColor).Foreground(whiteColor)
+			btnStyle = btnStyle.Background(dangerColor).Foreground(whiteColor)
 		}
 	}
 	var timeStr string
@@ -171,9 +161,9 @@ func (m OtpModel) View() string {
 		timeStr = " in " + m.timer.View()
 		btnStyle = btnStyle.Width(15)
 	}
-	sb.WriteString(btnInputStyle.Render(btnStyle.Render(fmt.Sprintf("Resend%v", timeStr))))
+	sb.WriteString(btnInputStyle.Align(lipgloss.Center).Render(btnStyle.Render(fmt.Sprintf("Resend%v", timeStr))))
 	otpContainedView := c.Render(sb.String())
-	return containerCentered(otpContainedView)
+	return formContainerCentered(otpContainedView)
 }
 
 // Helpers & Stuff -----------------------------------------------------------------------------------------------------
@@ -189,7 +179,7 @@ func (m OtpModel) validateOtp() error {
 func (m *OtpModel) populateErr(err string) {
 	m.otp.Reset()
 	m.otp.Placeholder = err
-	m.otp.PlaceholderStyle = lipgloss.NewStyle().Foreground(secondaryColor)
+	m.otp.PlaceholderStyle = lipgloss.NewStyle().Foreground(dangerColor)
 	m.dangerState = true
 	maps.Clear(m.ev.Errors)
 }
@@ -198,9 +188,9 @@ func (m OtpModel) activateUser() tea.Cmd {
 	return func() tea.Msg {
 		if err := m.client.ActivateUser(m.otp.Value()); err != nil {
 			if errors.Is(err, client.ErrExpiredOTP) {
-				return errMsg("Expired!")
+				return errMsg{err: "Expired!"}
 			} else {
-				return errMsg(err.Error())
+				return errMsg{err: err.Error()}
 			}
 		} else {
 			return doneMsg{}
@@ -211,7 +201,7 @@ func (m OtpModel) activateUser() tea.Cmd {
 func (m OtpModel) resendOtp() tea.Cmd {
 	return func() tea.Msg {
 		if err := m.client.ResendOtp(m.userEmail); err != nil {
-			return errMsg(err.Error())
+			return errMsg{err: err.Error()}
 		}
 		return nil
 	}

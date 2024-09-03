@@ -6,13 +6,15 @@ type Facade struct {
 	*UserFacade
 	*TokenFacade
 	*MessageFacade
+	*ConversationFacade
 }
 
-func New(uf *UserFacade, tf *TokenFacade, mf *MessageFacade) *Facade {
+func New(uf *UserFacade, tf *TokenFacade, mf *MessageFacade, cf *ConversationFacade) *Facade {
 	return &Facade{
-		UserFacade:    uf,
-		TokenFacade:   tf,
-		MessageFacade: mf,
+		UserFacade:         uf,
+		TokenFacade:        tf,
+		MessageFacade:      mf,
+		ConversationFacade: cf,
 	}
 }
 

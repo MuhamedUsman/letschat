@@ -9,8 +9,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/muesli/reflow/wordwrap"
-	"github.com/muesli/reflow/wrap"
+	"github.com/charmbracelet/x/ansi"
 	"golang.org/x/exp/maps"
 	"strings"
 )
@@ -22,7 +21,7 @@ type LoginModel struct {
 	spin         bool
 	activeBtn    int  // -1 -> none, 0 -> Continue 1 -> Signup
 	tabIdx       int  // 0 - 1 -> txtInputs | 2 - 3 -> Continue & Signup btns
-	dangerState  bool // we turn the form to secondaryColor
+	dangerState  bool // we turn the form to dangerColor
 	errMsg       errMsg
 	ev           *domain.ErrValidation
 	client       *client.Client
@@ -79,9 +78,9 @@ func (m LoginModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		m.handleActiveTabIdxElement()
-		// must be after handling the active tab indices method
+		// must be after handling the activeTab tab indices method
 		m.dangerState = false // once there is a keypress remove the danger state
-		m.errMsg = ""
+		m.errMsg.err = ""
 		switch msg.String() {
 		case "ctrl+c", "q":
 			return m, tea.Quit
@@ -115,17 +114,18 @@ func (m LoginModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				m.tabIdx--
 			}
-		case "left":
-			if m.tabIdx == 3 {
-				m.activeBtn = 0
-				m.tabIdx--
-			}
 		case "right":
 			if m.tabIdx == 2 {
 				m.activeBtn = 1
 				m.tabIdx++
 			}
+		case "left":
+			if m.tabIdx == 3 {
+				m.activeBtn = 0
+				m.tabIdx--
+			}
 		}
+
 		{ // Updating btns
 			if m.tabIdx == 2 {
 				m.activeBtn = 0
@@ -144,7 +144,7 @@ func (m LoginModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case InActiveUser:
 		m.spin = false
 		m.dangerState = true
-		m.errMsg = "initiating account activation"
+		m.errMsg.err = "initiating account activation"
 		otpModel := InitialOTPModel(m.txtInputs[0].Value())
 		return otpModel, tea.Sequence(m.resendOtp(), otpModel.Init())
 
@@ -156,8 +156,8 @@ func (m LoginModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case doneMsg:
 		m.spin = false
-		// TODO: redirect user to chat view
-		return m, tea.Quit
+		mainModel := InitialTabContainerModel()
+		return mainModel, mainModel.Init()
 	}
 	// as the user focuses the input fields we reset the placeholders to defaults
 	for i := range m.txtInputs {
@@ -172,9 +172,9 @@ func (m LoginModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m LoginModel) View() string {
 	var sb strings.Builder
 	sb.WriteString(letschatLogo)
-	if m.errMsg != "" && m.dangerState {
-		e := wrap.String(wordwrap.String(m.errMsg.String(), 60), 60)
-		sb.WriteString(infoTxtStyle.Foreground(secondaryColor).Render(e))
+	if m.errMsg.err != "" && m.dangerState {
+		e := ansi.Wordwrap(m.errMsg.String(), 60, " ")
+		sb.WriteString(infoTxtStyle.Foreground(dangerColor).Render(e))
 	} else {
 		sb.WriteString(infoTxtStyle.Render("Login to your account"))
 	}
@@ -197,20 +197,20 @@ func (m LoginModel) View() string {
 			} else {
 				continueBtnTxt = "Continue"
 			}
-			continueBtn = activeButtonStyleWithColor(whiteColor, primaryColor).Render(continueBtnTxt)
+			continueBtn = activeButtonStyleWithColor(primaryContrastColor, primaryColor).Render(continueBtnTxt)
 			sb.WriteString(activeBtnInputStyle.Render(continueBtn, signupBtn))
 		} else if m.activeBtn == 1 {
-			signupBtn = activeButtonStyleWithColor(whiteColor, primaryColor).Render("Register")
+			signupBtn = activeButtonStyleWithColor(primaryContrastColor, primaryColor).Render("Register")
 			sb.WriteString(activeBtnInputStyle.Render(continueBtn, signupBtn))
 		}
 	} else {
 		sb.WriteString(btnInputStyle.Render(continueBtn, signupBtn))
 	}
-	c := container
+	c := formContainer
 	if m.dangerState {
-		c = c.BorderForeground(secondaryColor)
+		c = c.BorderForeground(dangerColor)
 	}
-	return containerCentered(c.Render(sb.String()))
+	return formContainerCentered(c.Render(sb.String()))
 }
 
 // Helpers & Stuff -----------------------------------------------------------------------------------------------------
@@ -224,7 +224,7 @@ func (m *LoginModel) validateLoginModel() error {
 	populateErr := func(idx int, err string) {
 		m.txtInputs[idx].Reset()
 		m.txtInputs[idx].Placeholder = err
-		m.txtInputs[idx].PlaceholderStyle = lipgloss.NewStyle().Foreground(secondaryColor)
+		m.txtInputs[idx].PlaceholderStyle = lipgloss.NewStyle().Foreground(dangerColor)
 	}
 
 	if m.ev.HasErrors() {
@@ -273,7 +273,7 @@ func (m LoginModel) login() tea.Cmd {
 			if errors.Is(err, client.ErrNonActiveUser) {
 				return InActiveUser{}
 			}
-			return errMsg(err.Error())
+			return errMsg{err: err.Error()}
 		} else {
 			return doneMsg{}
 		}
@@ -283,7 +283,7 @@ func (m LoginModel) login() tea.Cmd {
 func (m LoginModel) resendOtp() tea.Cmd {
 	return func() tea.Msg {
 		if err := m.client.ResendOtp(m.txtInputs[0].Value()); err != nil {
-			return errMsg(err.Error())
+			return errMsg{err: err.Error()}
 		}
 		return nil
 	}

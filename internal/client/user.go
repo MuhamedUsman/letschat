@@ -8,7 +8,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"strings"
 )
 
 // Register will register the user & populate the *domain.UserRegister with validation errors
@@ -22,10 +21,7 @@ func (*Client) Register(u *domain.UserRegister) error {
 	resp, err := http.DefaultClient.Post(registerUser, "application/json", bytes.NewBuffer(body))
 	if err != nil {
 		log.Println(err.Error())
-		if strings.Contains(strings.ToLower(err.Error()), ErrServerDown.Error()) {
-			return ErrServerDown
-		}
-		return err
+		return getMostNestedError(err)
 	}
 	defer resp.Body.Close()
 	switch resp.StatusCode {
@@ -58,11 +54,8 @@ func (c *Client) Login(u domain.UserAuth) error {
 	}
 	res, err := http.DefaultClient.Post(authenticate, "application/json", bytes.NewBuffer(b))
 	if err != nil {
-		if strings.Contains(strings.ToLower(err.Error()), ErrServerDown.Error()) {
-			return ErrServerDown
-		}
 		log.Println(err.Error())
-		return err
+		return getMostNestedError(err)
 	}
 	defer res.Body.Close()
 	readBody, err := io.ReadAll(res.Body)
@@ -78,7 +71,6 @@ func (c *Client) Login(u domain.UserAuth) error {
 			log.Println(err.Error())
 			return err
 		}
-		log.Println("authToken", c.AuthToken, "api token", token.Token)
 		c.AuthToken = token.Token
 	} else {
 		var ev struct {
@@ -95,7 +87,7 @@ func (c *Client) Login(u domain.UserAuth) error {
 		}
 	}
 	// putting auth token in keyring
-	if err = c.krm.setAuthTokenInKeyring(c.AuthToken); err != nil {
+	if err = c.krm.setAuthTokenInKeyring(u.Email, c.AuthToken); err != nil {
 		log.Println(err.Error())
 		return err
 	}
@@ -115,18 +107,13 @@ func (c *Client) ActivateUser(otp string) error {
 	res, err := http.Post(activateUser, "application/json", bytes.NewBuffer(jsonBytes))
 	if err != nil {
 		log.Println(err.Error())
-		if strings.Contains(strings.ToLower(err.Error()), ErrServerDown.Error()) {
-			return ErrServerDown
-		}
-		return err
+		return getMostNestedError(err)
 	}
 	defer res.Body.Close()
 	if res.StatusCode != http.StatusOK {
 		log.Println(res.Status)
-		log.Printf("%+v", res)
 		resBody, _ := io.ReadAll(res.Body)
 		_ = json.Unmarshal(resBody, &token)
-		log.Printf("%+v", token)
 		return ErrExpiredOTP
 	}
 	return nil

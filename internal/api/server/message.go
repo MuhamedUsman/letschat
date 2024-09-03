@@ -30,26 +30,19 @@ func (s *Server) GetPagedMessageHandler(w http.ResponseWriter, r *http.Request) 
 }
 
 func (s *Server) populateFilter(w http.ResponseWriter, r *http.Request) (*domain.Filter, *domain.ErrValidation) {
-	var query struct {
-		Page     int `json:"page"`
-		PageSize int `json:"pageSize"`
-	}
+	var filter domain.Filter
 	v := r.URL.Query()
 	ev := domain.NewErrValidation()
-	query.Page = s.readInt(v, "page", 1, ev)
-	query.PageSize = s.readInt(v, "pageSize", 25, ev)
+	filter.Page = s.readInt(v, "page", 1, ev)
+	filter.PageSize = s.readInt(v, "size", 25, ev)
 	if ev.HasErrors() {
 		s.failedValidationResponse(w, r, ev.Errors)
 		return nil, ev
 	}
-	filter := &domain.Filter{
-		Page:     query.Page,
-		PageSize: query.PageSize,
-	}
-	domain.ValidateFilters(ev, filter)
+	domain.ValidateFilters(ev, &filter)
 	if ev.HasErrors() {
 		s.failedValidationResponse(w, r, ev.Errors)
 		return nil, ev
 	}
-	return filter, nil
+	return &filter, nil
 }

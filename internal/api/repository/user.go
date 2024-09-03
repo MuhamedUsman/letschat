@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/M0hammadUsman/letschat/internal/domain"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jmoiron/sqlx"
 	"log/slog"
 )
 
@@ -90,7 +91,7 @@ func (r *UserRepository) GetByUniqueField(ctx context.Context, fieldName, fieldV
 func (r *UserRepository) UpdateUser(ctx context.Context, u *domain.User) error {
 	query := `
 		UPDATE users 
-		SET name = :name, email = :email, password = :password, version = version + 1
+		SET name = :name, email = :email, password = :password, last_online = :last_online, version = version + 1
 		WHERE id = :id AND version = :version
 		`
 	tx := contextGetTX(ctx)
@@ -163,4 +164,45 @@ func (r *UserRepository) ActivateUser(ctx context.Context, user *domain.User) er
 		return domain.ErrEditConflict
 	}
 	return nil
+}
+
+func (r *UserRepository) GetByQuery(
+	ctx context.Context,
+	paramName, paramValue string,
+	filter domain.Filter,
+) ([]*domain.User, *domain.Metadata, error) {
+	query := fmt.Sprintf(`
+	SELECT COUNT(*) OVER() total, *
+	FROM users
+	WHERE STRICT_WORD_SIMILARITY($1, %v) > 0.5 AND activated = TRUE
+	ORDER BY STRICT_WORD_SIMILARITY($1, %v)
+	LIMIT $2
+	OFFSET $3
+	`, paramName, paramName)
+	args := []any{paramValue, filter.Limit(), filter.Offset()}
+	var rows *sqlx.Rows
+	if tx := contextGetTX(ctx); tx != nil {
+		rows, _ = tx.QueryxContext(ctx, query, args...)
+	} else {
+		rows, _ = r.db.QueryxContext(ctx, query, args...)
+	}
+	defer rows.Close()
+	var total int
+	users := make([]*domain.User, 0)
+	for rows.Next() {
+		var row struct {
+			Total int `db:"total"`
+			domain.User
+		}
+		if err := rows.StructScan(&row); err != nil {
+			return nil, &domain.Metadata{}, err
+		}
+		total = row.Total
+		users = append(users, &row.User)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, &domain.Metadata{}, err
+	}
+	metadata := domain.CalculateMetadata(total, filter.PageSize, filter.Page)
+	return users, &metadata, nil
 }

@@ -2,6 +2,7 @@ package server
 
 import (
 	"errors"
+	"github.com/M0hammadUsman/letschat/internal/api/common"
 	"github.com/M0hammadUsman/letschat/internal/domain"
 	"net/http"
 )
@@ -83,5 +84,29 @@ func (s *Server) ActivateUserHandler(w http.ResponseWriter, r *http.Request) {
 			s.serverErrorResponse(w, r, err)
 		}
 		return
+	}
+}
+
+func (s *Server) SearchUserHandler(w http.ResponseWriter, r *http.Request) {
+	var filter domain.Filter
+	v := r.URL.Query()
+	ev := domain.NewErrValidation()
+	queryParam := s.readString(v, "param", "")
+	filter.Page = s.readInt(v, "page", 1, ev)
+	filter.PageSize = s.readInt(v, "size", 30, ev)
+	if ev.HasErrors() {
+		s.failedValidationResponse(w, r, ev.Errors)
+		return
+	}
+	users, metadata, err := s.Facade.SearchUser(r.Context(), queryParam, filter)
+	if err = s.writeJSON(w, envelop{"users": users, "metadata": metadata}, http.StatusOK, nil); err != nil {
+		s.serverErrorResponse(w, r, err)
+	}
+}
+
+func (s *Server) GetCurrentActiveUserHandler(w http.ResponseWriter, r *http.Request) {
+	u := common.ContextGetUser(r.Context())
+	if err := s.writeJSON(w, envelop{"user": u}, http.StatusOK, nil); err != nil {
+		s.serverErrorResponse(w, r, err)
 	}
 }

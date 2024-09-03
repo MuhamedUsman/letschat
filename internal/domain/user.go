@@ -12,15 +12,14 @@ var (
 )
 
 type User struct {
-	ID         string    `json:"id"`
-	Name       string    `json:"name"`
-	Email      string    `json:"email"`
-	Password   []byte    `json:"-"`
-	Activated  bool      `json:"-"`
-	Online     bool      `json:"online"`
-	LastOnline time.Time `json:"lastOnline" db:"last_online"`
-	CreatedAt  time.Time `json:"createdAt"  db:"created_at"`
-	Version    int       `json:"version"`
+	ID         string     `json:"id"`
+	Name       string     `json:"name"`
+	Email      string     `json:"email"`
+	Password   []byte     `json:"-"`
+	Activated  bool       `json:"-"`
+	LastOnline *time.Time `json:"lastOnline,omitempty" db:"last_online"`
+	CreatedAt  time.Time  `json:"createdAt"  db:"created_at"`
+	Version    int        `json:"-"`
 	// Websocket related
 	Messages  MsgChan `json:"-"`
 	CloseSlow func()  `json:"-"`
@@ -31,9 +30,11 @@ type UserService interface {
 	ExistsUser(ctx context.Context, email string) (bool, error)
 	GetByUniqueField(ctx context.Context, fieldValue string) (*User, error)
 	UpdateUser(ctx context.Context, u *UserUpdate) error
+	UpdateUserOnlineStatus(ctx context.Context, usr *User, online bool) error
 	GetForToken(ctx context.Context, scope string, plainToken string) (*User, error)
 	ActivateUser(ctx context.Context, user *User) error
 	AuthenticateUser(ctx context.Context, u *UserAuth) (string, error)
+	GetByQuery(ctx context.Context, queryParam string, filter Filter) ([]*User, *Metadata, error)
 }
 
 type UserRepository interface {
@@ -43,6 +44,7 @@ type UserRepository interface {
 	UpdateUser(ctx context.Context, u *User) error
 	GetForToken(ctx context.Context, scope string, hash []byte) (*User, error)
 	ActivateUser(ctx context.Context, user *User) error
+	GetByQuery(ctx context.Context, paramName string, paramValue string, filter Filter) ([]*User, *Metadata, error)
 }
 
 // DTOs

@@ -4,6 +4,7 @@ import (
 	"github.com/M0hammadUsman/letschat/internal/client"
 	"github.com/M0hammadUsman/letschat/internal/tui"
 	tea "github.com/charmbracelet/bubbletea"
+	zone "github.com/lrstanley/bubblezone"
 	"log"
 )
 
@@ -18,7 +19,9 @@ func main() {
 	if err = client.Init(); err != nil {
 		log.Fatal(err)
 	}
-	if _, err = tea.NewProgram(tui.InitialLoginModel(), tea.WithAltScreen()).Run(); err != nil {
+	zone.NewGlobal()
+	_, err = tea.NewProgram(tui.InitialTabContainerModel(), tea.WithAltScreen(), tea.WithMouseAllMotion()).Run()
+	if err != nil {
 		log.Fatal(err)
 	}
 }

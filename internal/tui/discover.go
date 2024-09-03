@@ -1,0 +1,235 @@
+package tui
+
+import (
+	"github.com/M0hammadUsman/letschat/internal/client"
+	"github.com/M0hammadUsman/letschat/internal/domain"
+	"github.com/charmbracelet/bubbles/cursor"
+	"github.com/charmbracelet/bubbles/spinner"
+	"github.com/charmbracelet/bubbles/table"
+	"github.com/charmbracelet/bubbles/textinput"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+	zone "github.com/lrstanley/bubblezone"
+	"strconv"
+	"unicode/utf8"
+)
+
+const (
+	discoverSearchBar = "discoverSearchBar"
+	discoverTable     = "discoverTable"
+)
+
+type DiscoverModel struct {
+	searchTxtInput textinput.Model
+	table          table.Model
+	metadata       domain.Metadata
+	totalPages     int
+	focusIdx       int // 0 -> Search, 1 -> Table
+	placeholder    string
+	client         *client.Client
+}
+
+func InitialDiscoverModel(c *client.Client, s *spinner.Model) DiscoverModel {
+	m := DiscoverModel{
+		placeholder: "Bashbunni OR bashbunni@bunnibrain.letschat",
+		table:       newDiscoverTable(),
+		client:      c,
+	}
+	m.searchTxtInput = newDiscoverTextInput(m.placeholder)
+	m.searchTxtInput.Cursor = newDiscoverCursor()
+	return m
+}
+
+func (m DiscoverModel) Init() tea.Cmd {
+	return textinput.Blink
+}
+
+func (m DiscoverModel) Update(msg tea.Msg) (DiscoverModel, tea.Cmd) {
+
+	m.handleDiscoverTableHeight()
+	// Fetching more records if the user is in the end of the table
+	curPage := m.metadata.CurrentPage
+	if m.table.Cursor() == len(m.table.Rows())-5 && curPage < m.metadata.LastPage && ioStatus == "" {
+		ioStatus = "Fetching more"
+		return m, tea.Batch(m.searchUser(m.searchTxtInput.Value(), curPage+1), spinnerSpinCmd)
+	}
+
+	switch msg := msg.(type) {
+
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "ctrl+c":
+			return m, tea.Quit
+		case "ctrl+f":
+			m.focusIdx = 0
+			return m, m.focusAccordingly()
+		case "up", "down":
+			m.focusIdx = 1
+		case "enter":
+			if m.focusIdx == 0 {
+				if utf8.RuneCountInString(m.searchTxtInput.Value()) > 0 {
+					m.table.SetRows(nil) // clearing any previous records
+					ioStatus = "Searching"
+					return m, tea.Batch(spinnerSpinCmd, m.searchUser(m.searchTxtInput.Value(), 1))
+				}
+			}
+		}
+
+	case tea.MouseMsg:
+		switch msg.Button {
+		case tea.MouseButtonLeft:
+			if zone.Get(discoverSearchBar).InBounds(msg) {
+				m.focusIdx = 0
+				return m, m.focusAccordingly()
+			}
+			if zone.Get(discoverTable).InBounds(msg) {
+				m.focusIdx = 1
+				return m, m.focusAccordingly()
+			}
+		case tea.MouseButtonWheelDown:
+			if zone.Get(discoverTable).InBounds(msg) {
+				m.focusIdx = 1
+				m.table.MoveDown(1)
+				return m, m.focusAccordingly()
+			}
+		case tea.MouseButtonWheelUp:
+			if zone.Get(discoverTable).InBounds(msg) {
+				m.focusIdx = 1
+				m.table.MoveUp(1)
+				return m, m.focusAccordingly()
+			}
+		default:
+		}
+
+	case tableResp:
+		m.table.SetRows(msg.rows)
+		m.metadata = msg.metadata
+		if m.metadata.CurrentPage == 1 {
+			m.table.SetCursor(0)
+		}
+		if len(m.table.Rows()) > 0 {
+			m.focusIdx = 1
+			return m, tea.Batch(m.focusAccordingly(), spinnerResetCmd)
+		}
+		m.focusIdx = 0
+		return m, spinnerResetCmd
+	}
+
+	return m, tea.Batch(m.handleTxtInput(msg), m.handleDiscoverTableUpdate(msg))
+}
+
+func (m *DiscoverModel) View() string {
+	bar := activeDiscoverBar.Render(m.searchTxtInput.View())
+	bar = zone.Mark(discoverSearchBar, bar)
+	var s string
+	if len(m.table.Rows()) > 0 {
+		s = discoverTableStyle.Render(m.table.View())
+		s = zone.Mark(discoverTable, s)
+	} else {
+		s = bunny
+		s = lipgloss.PlaceVertical(terminalHeight-10, lipgloss.Center, s)
+	}
+	return lipgloss.JoinVertical(lipgloss.Center, bar, s)
+}
+
+// Helpers & Stuff -----------------------------------------------------------------------------------------------------
+
+func newDiscoverTextInput(placeholder string) textinput.Model {
+	ti := textinput.New()
+	ti.TextStyle = lipgloss.NewStyle().Foreground(primaryColor)
+	ti.Focus()
+	ti.CharLimit = 64
+	ti.Prompt = ""
+	ti.Placeholder = placeholder
+	return ti
+}
+
+func newDiscoverCursor() cursor.Model {
+	c := cursor.New()
+	cStyle := lipgloss.NewStyle().Foreground(primaryColor)
+	c.Style = cStyle
+	c.TextStyle = cStyle
+	return c
+}
+
+func newDiscoverTable() table.Model {
+	s := table.DefaultStyles()
+	s.Header = s.Header.
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(primaryColor).
+		Foreground(primaryColor).
+		BorderBottom(true).
+		Bold(false)
+	s.Selected = s.Selected.
+		Foreground(primaryContrastColor).
+		Background(primaryColor).
+		Bold(false)
+
+	cols := []table.Column{
+		{"#", 5},
+		{"Name", 30},
+		{"Email", 46},
+		{"Joined Since", 20},
+	}
+	t := table.New(table.WithColumns(cols))
+	t.SetStyles(s)
+	return t
+}
+
+func (m *DiscoverModel) handleTxtInput(msg tea.Msg) tea.Cmd {
+	var cmd tea.Cmd
+	m.searchTxtInput, cmd = m.searchTxtInput.Update(msg)
+	return cmd
+}
+
+func (m *DiscoverModel) handleDiscoverTableUpdate(msg tea.Msg) tea.Cmd {
+	var cmd tea.Cmd
+	m.table, cmd = m.table.Update(msg)
+	return cmd
+}
+
+func (m *DiscoverModel) handleDiscoverTableHeight() {
+	h := terminalHeight - 14
+	m.table.SetHeight(h)
+}
+
+func (m *DiscoverModel) focusAccordingly() tea.Cmd {
+	var cmd tea.Cmd
+	if m.focusIdx == 0 {
+		cmd = m.searchTxtInput.Focus()
+		m.table.Blur()
+	} else if m.focusIdx == 1 {
+		m.table.Focus()
+		m.searchTxtInput.Blur()
+	}
+	return cmd
+}
+
+type tableResp struct {
+	rows     []table.Row
+	metadata domain.Metadata
+}
+
+func (m DiscoverModel) searchUser(query string, page int) tea.Cmd {
+	return func() tea.Msg {
+		resp, err, code := m.client.SearchUser(query, page)
+		if code == 401 {
+			return requireAuthMsg{}
+		}
+		if err != nil {
+			return &errMsg{err: err.Error(), code: code}
+		}
+		rows := m.table.Rows()
+		l := len(rows)
+		for _, u := range resp.Users {
+			cell := table.Row{strconv.Itoa(l + 1), u.Name, u.Email, u.CreatedAt.Format("January 2006")}
+			l++
+			rows = append(rows, cell)
+		}
+		m.table.SetRows(rows)
+		return tableResp{
+			rows:     rows,
+			metadata: resp.Metadata,
+		}
+	}
+}
