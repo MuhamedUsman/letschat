@@ -2,7 +2,7 @@ package server
 
 import (
 	"fmt"
-	common2 "github.com/M0hammadUsman/letschat/internal/api/common"
+	"github.com/M0hammadUsman/letschat/internal/api/common"
 	"github.com/M0hammadUsman/letschat/internal/api/facade"
 	"github.com/M0hammadUsman/letschat/internal/domain"
 	"github.com/coder/websocket"
@@ -16,8 +16,8 @@ import (
 )
 
 type Server struct {
-	Config                  *common2.Config
-	BackgroundTask          *common2.BackgroundTask
+	Config                  *common.Config
+	BackgroundTask          *common.BackgroundTask
 	Facade                  *facade.Facade
 	wsAcceptOpts            *websocket.AcceptOptions
 	subscriberMessageBuffer int
@@ -27,7 +27,7 @@ type Server struct {
 	Subscribers map[string]*domain.User
 }
 
-func NewServer(cfg *common2.Config, bt *common2.BackgroundTask, facade *facade.Facade) *Server {
+func NewServer(cfg *common.Config, bt *common.BackgroundTask, facade *facade.Facade) *Server {
 	return &Server{
 		Config:         cfg,
 		BackgroundTask: bt,

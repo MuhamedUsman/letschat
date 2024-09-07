@@ -31,13 +31,32 @@ func (r *ConversationRepository) CreateConversation(ctx context.Context, senderI
 }
 
 func (r *ConversationRepository) GetConversations(ctx context.Context, usrID string) ([]*domain.Conversation, error) {
+	/*query := `
+			SELECT sender_id, sender.name sender_name, sender.email sender_email,
+	            receiver_id, receiver.name receiver_name, receiver.email receiver_email,
+	            CASE
+	                WHEN sender_id = $1 THEN sender.last_online
+	                ELSE receiver.last_online
+	                END AS last_online
+			FROM conversation
+			    INNER JOIN users sender ON sender_id = sender.id
+			    INNER JOIN users receiver ON receiver_id = receiver.id
+			WHERE sender_id = $1 OR receiver_id = $1
+			`*/
 	query := `
-		SELECT sender_id, sender.name sender_name, sender.email sender_email,
-            receiver_id, receiver.name receiver_name, receiver.email receiver_email,
-            CASE 
-                WHEN sender_id = $1 THEN sender.last_online 
-                ELSE receiver.last_online
-                END AS last_online
+		SELECT sender_id, receiver_id,
+        CASE 
+            WHEN sender_id = $1 THEN receiver.name
+            ELSE sender.name
+        END AS display_name,
+        CASE 
+            WHEN sender_id = $1 THEN receiver.email
+            ELSE sender.email
+        END AS display_email,
+        CASE 
+            WHEN sender_id = $1 THEN receiver.last_online
+            ELSE sender.last_online
+        END AS last_online
 		FROM conversation
 		    INNER JOIN users sender ON sender_id = sender.id
 		    INNER JOIN users receiver ON receiver_id = receiver.id

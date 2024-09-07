@@ -1,11 +1,13 @@
 package client
 
 const (
-	baseUrl            = "http://localhost:8080/v1"
-	usersEndpoint      = "/users"
-	tokensEndpoint     = "/tokens"
-	messagesEndpoint   = "/messages"
-	websocketsEndpoint = "/sub"
+	baseUrl               = "http://localhost:8080/v1"
+	usersEndpoint         = "/users"
+	tokensEndpoint        = "/tokens"
+	messagesEndpoint      = "/messages"
+	conversationsEndpoint = "/conversations"
+	wsBaseUrl             = "ws://localhost:8080/v1"
+	websocketsEndpoint    = "/sub"
 
 	registerUser         = baseUrl + usersEndpoint // POST
 	getByUniqueField     = baseUrl + usersEndpoint // GET
@@ -17,7 +19,9 @@ const (
 	generateOTP  = baseUrl + tokensEndpoint + "/otp"  // POST
 	authenticate = baseUrl + tokensEndpoint + "/auth" // POST
 
+	getConversations = baseUrl + conversationsEndpoint
+
 	getMessages = baseUrl + messagesEndpoint // GET
 
-	subscribeTo = baseUrl + websocketsEndpoint
+	subscribeTo = wsBaseUrl + websocketsEndpoint
 )

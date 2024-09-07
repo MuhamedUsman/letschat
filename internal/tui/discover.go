@@ -4,7 +4,6 @@ import (
 	"github.com/M0hammadUsman/letschat/internal/client"
 	"github.com/M0hammadUsman/letschat/internal/domain"
 	"github.com/charmbracelet/bubbles/cursor"
-	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -25,32 +24,35 @@ type DiscoverModel struct {
 	metadata       domain.Metadata
 	totalPages     int
 	focusIdx       int // 0 -> Search, 1 -> Table
+	focus          bool
 	placeholder    string
 	client         *client.Client
 }
 
-func InitialDiscoverModel(c *client.Client, s *spinner.Model) DiscoverModel {
+func InitialDiscoverModel(c *client.Client) DiscoverModel {
 	m := DiscoverModel{
 		placeholder: "Bashbunni OR bashbunni@bunnibrain.letschat",
 		table:       newDiscoverTable(),
+		focus:       true,
 		client:      c,
 	}
-	m.searchTxtInput = newDiscoverTextInput(m.placeholder)
+	m.searchTxtInput = newDiscoverTxtInput(m.placeholder)
 	m.searchTxtInput.Cursor = newDiscoverCursor()
 	return m
 }
 
 func (m DiscoverModel) Init() tea.Cmd {
-	return textinput.Blink
+	return nil
 }
 
 func (m DiscoverModel) Update(msg tea.Msg) (DiscoverModel, tea.Cmd) {
-
+	m.focusAccordingly()
 	m.handleDiscoverTableHeight()
 	// Fetching more records if the user is in the end of the table
 	curPage := m.metadata.CurrentPage
 	if m.table.Cursor() == len(m.table.Rows())-5 && curPage < m.metadata.LastPage && ioStatus == "" {
 		ioStatus = "Fetching more"
+		m.table.MoveDown(1)
 		return m, tea.Batch(m.searchUser(m.searchTxtInput.Value(), curPage+1), spinnerSpinCmd)
 	}
 
@@ -58,8 +60,6 @@ func (m DiscoverModel) Update(msg tea.Msg) (DiscoverModel, tea.Cmd) {
 
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "ctrl+c":
-			return m, tea.Quit
 		case "ctrl+f":
 			m.focusIdx = 0
 			return m, m.focusAccordingly()
@@ -115,7 +115,7 @@ func (m DiscoverModel) Update(msg tea.Msg) (DiscoverModel, tea.Cmd) {
 		return m, spinnerResetCmd
 	}
 
-	return m, tea.Batch(m.handleTxtInput(msg), m.handleDiscoverTableUpdate(msg))
+	return m, tea.Batch(m.handleDiscoverSearchTxtInput(msg), m.handleDiscoverTableUpdate(msg))
 }
 
 func (m *DiscoverModel) View() string {
@@ -129,12 +129,13 @@ func (m *DiscoverModel) View() string {
 		s = bunny
 		s = lipgloss.PlaceVertical(terminalHeight-10, lipgloss.Center, s)
 	}
-	return lipgloss.JoinVertical(lipgloss.Center, bar, s)
+	s = lipgloss.JoinVertical(lipgloss.Center, bar, s)
+	return lipgloss.PlaceHorizontal(terminalWidth-2, lipgloss.Center, s)
 }
 
 // Helpers & Stuff -----------------------------------------------------------------------------------------------------
 
-func newDiscoverTextInput(placeholder string) textinput.Model {
+func newDiscoverTxtInput(placeholder string) textinput.Model {
 	ti := textinput.New()
 	ti.TextStyle = lipgloss.NewStyle().Foreground(primaryColor)
 	ti.Focus()
@@ -166,9 +167,9 @@ func newDiscoverTable() table.Model {
 		Bold(false)
 
 	cols := []table.Column{
-		{"#", 5},
+		{"#", 6},
 		{"Name", 30},
-		{"Email", 46},
+		{"Email", 45},
 		{"Joined Since", 20},
 	}
 	t := table.New(table.WithColumns(cols))
@@ -176,7 +177,7 @@ func newDiscoverTable() table.Model {
 	return t
 }
 
-func (m *DiscoverModel) handleTxtInput(msg tea.Msg) tea.Cmd {
+func (m *DiscoverModel) handleDiscoverSearchTxtInput(msg tea.Msg) tea.Cmd {
 	var cmd tea.Cmd
 	m.searchTxtInput, cmd = m.searchTxtInput.Update(msg)
 	return cmd
@@ -195,12 +196,18 @@ func (m *DiscoverModel) handleDiscoverTableHeight() {
 
 func (m *DiscoverModel) focusAccordingly() tea.Cmd {
 	var cmd tea.Cmd
-	if m.focusIdx == 0 {
-		cmd = m.searchTxtInput.Focus()
-		m.table.Blur()
-	} else if m.focusIdx == 1 {
-		m.table.Focus()
+	if m.focus {
+		if m.focusIdx == 0 {
+			cmd = m.searchTxtInput.Focus()
+			m.table.Blur()
+		} else if m.focusIdx == 1 {
+			m.table.Focus()
+			m.searchTxtInput.Blur()
+		}
+	} else {
 		m.searchTxtInput.Blur()
+		m.table.Blur()
+		m.focusIdx = -1
 	}
 	return cmd
 }

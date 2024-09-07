@@ -15,11 +15,13 @@ import (
 	"time"
 )
 
-// once this is != "" TabContainerModel.spinner will searching
+// once ioStatus is not zero valued & spinnerSpinCmd is returned,
+// TabContainerModel.spinner will spin with ioStatus until spinnerResetCmd
 var ioStatus string
 
 type TabContainerModel struct {
 	discover  DiscoverModel
+	letschat  LetschatModel
 	tabs      []string
 	activeTab int
 	errMsg    *errMsg
@@ -33,16 +35,14 @@ type TabContainerModel struct {
 func InitialTabContainerModel() TabContainerModel {
 	t := []string{
 		"🔎 Discover",
-		"💭 Letschat",
-		"⚙️ Settings",
+		"💭 Conversations",
+		"⚙️ Preferences",
 	}
 	c := client.Get()
-
-	s := spinner.New(spinner.WithStyle(spinnerStyle))
-	s.Spinner = spinner.Points
-
+	s := spinner.New(spinner.WithStyle(spinnerStyle), spinner.WithSpinner(spinner.Points))
 	return TabContainerModel{
-		discover:  InitialDiscoverModel(c, &s),
+		discover:  InitialDiscoverModel(c),
+		letschat:  InitialLetschatModel(c),
 		tabs:      t,
 		activeTab: 1,
 		timer:     timer.New(0),
@@ -51,7 +51,6 @@ func InitialTabContainerModel() TabContainerModel {
 
 		client: c,
 	}
-
 }
 
 func (m TabContainerModel) Init() tea.Cmd {
@@ -59,9 +58,8 @@ func (m TabContainerModel) Init() tea.Cmd {
 }
 
 func (m TabContainerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-
+	m.setChildModelFocus()
 	switch msg := msg.(type) {
-
 	case tea.WindowSizeMsg:
 		terminalHeight = msg.Height
 		terminalWidth = msg.Width
@@ -101,7 +99,7 @@ func (m TabContainerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.resetSpinner()
 		m.errMsg = msg
 		if m.timer.Timedout() {
-			m.timer = timer.New(5 * time.Second)
+			m.timer = timer.New(3 * time.Second)
 			return m, m.timer.Init()
 		}
 
@@ -124,7 +122,7 @@ func (m TabContainerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.user = msg
 	}
 
-	return m, tea.Batch(m.handleDiscoverModelUpdate(msg), m.handleStopwatchUpdate(msg))
+	return m, tea.Batch(m.handleChildModelUpdates(msg), m.handleStopwatchUpdate(msg))
 }
 
 func (m TabContainerModel) View() string {
@@ -160,7 +158,6 @@ func (m TabContainerModel) View() string {
 	}
 	content := m.populateActiveTabContent()
 	c := renderContainerWithTabs(t, content)
-
 	return zone.Scan(c)
 }
 
@@ -169,7 +166,11 @@ func (m TabContainerModel) View() string {
 func renderTabsWithGapsAndText(tabs, textL, textR string) string {
 	w := (terminalWidth - lipgloss.Width(tabs) - 4) / 2
 	gapL := tabGapLeft.Width(w).Render(statusText.Render("Letschat"))
+	// used for divider in conversations tab
+	tabGapLeftWidth = lipgloss.Width(gapL)
 	gapR := tabGapRight.Width(w).Render(statusText.Render(textR))
+	// used for chat container in conversations tab
+	tabGapRightWithTabsWidth = lipgloss.Width(gapR) + lipgloss.Width(tabs)
 	if textL != "" {
 		gapL = tabGapLeft.Width(w).Render(statusText.Render(textL))
 	}
@@ -180,7 +181,7 @@ func renderContainerWithTabs(tabs string, content string) string {
 	w := lipgloss.Width(tabs) - 2
 	h := terminalHeight - lipgloss.Height(tabs) - 1
 	c := tabContainer.Width(max(0, w)).Height(max(0, h)).Render(content)
-	return lipgloss.JoinVertical(lipgloss.Right, tabs, c)
+	return lipgloss.JoinVertical(lipgloss.Center, tabs, c)
 }
 
 func renderErrContainer(err string, code int, timer string) string {
@@ -198,13 +199,21 @@ func renderErrContainer(err string, code int, timer string) string {
 		lipgloss.WithWhitespaceForeground(darkGreyColor))
 }
 
-func (m *TabContainerModel) handleDiscoverModelUpdate(msg tea.Msg) tea.Cmd {
-	cmds := make([]tea.Cmd, 0)
-	var cmd tea.Cmd
-	if m.activeTab == 0 {
-		m.discover, cmd = m.discover.Update(msg)
-		cmds = append(cmds, cmd)
+func (m *TabContainerModel) setChildModelFocus() {
+	m.discover.focus = false
+	m.letschat.focus = false
+	switch m.activeTab {
+	case 0:
+		m.discover.focus = true
+	case 1:
+		m.letschat.focus = true
 	}
+}
+
+func (m *TabContainerModel) handleChildModelUpdates(msg tea.Msg) tea.Cmd {
+	cmds := make([]tea.Cmd, 2)
+	m.discover, cmds[0] = m.discover.Update(msg)
+	m.letschat, cmds[1] = m.letschat.Update(msg)
 	return tea.Batch(cmds...)
 }
 
@@ -236,10 +245,14 @@ func (m *TabContainerModel) resetSpinner() {
 }
 
 func (m *TabContainerModel) populateActiveTabContent() string {
-	if m.activeTab == 0 {
+	switch m.activeTab {
+	case 0:
 		return m.discover.View()
+	case 1:
+		return m.letschat.View()
+	default:
+		return ""
 	}
-	return ""
 }
 
 func (m *TabContainerModel) getCurrentActiveUser() tea.Cmd {

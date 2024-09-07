@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strconv"
 )
 
 // Register will register the user & populate the *domain.UserRegister with validation errors
@@ -117,4 +118,59 @@ func (c *Client) ActivateUser(otp string) error {
 		return ErrExpiredOTP
 	}
 	return nil
+}
+
+type PagedUserResponse struct {
+	Metadata domain.Metadata `json:"metadata"`
+	Users    []domain.User   `json:"users"`
+}
+
+func (c *Client) SearchUser(param string, page int) (*PagedUserResponse, error, int) {
+	r, err := http.NewRequest(http.MethodGet, searchUser, nil)
+	if err != nil {
+		log.Println(err.Error())
+		return nil, ErrApplication, 0
+	}
+	r.Header.Set("Authorization", "Bearer "+c.AuthToken)
+	v := r.URL.Query()
+	v.Set("param", param)
+	v.Set("page", strconv.Itoa(page))
+	r.URL.RawQuery = v.Encode()
+	resp, err := http.DefaultClient.Do(r)
+	if err != nil {
+		log.Println(err.Error())
+		return nil, getMostNestedError(err), http.StatusServiceUnavailable
+	}
+	defer resp.Body.Close()
+	readBody, _ := io.ReadAll(resp.Body)
+	var pur PagedUserResponse
+	if err = json.Unmarshal(readBody, &pur); err != nil {
+		log.Println(err.Error())
+		return nil, ErrApplication, 0
+	}
+	return &pur, nil, resp.StatusCode
+}
+
+func (c *Client) GetCurrentActiveUser() (*domain.User, error, int) {
+	r, err := http.NewRequest(http.MethodGet, getCurrentActiveUser, nil)
+	if err != nil {
+		log.Println(err.Error())
+		return nil, ErrApplication, 0
+	}
+	r.Header.Set("Authorization", "Bearer "+c.AuthToken)
+	resp, err := http.DefaultClient.Do(r)
+	if err != nil {
+		log.Println(err.Error())
+		return nil, getMostNestedError(err), http.StatusServiceUnavailable
+	}
+	defer resp.Body.Close()
+	readBody, _ := io.ReadAll(resp.Body)
+	var response struct {
+		User domain.User `json:"user"`
+	}
+	if err = json.Unmarshal(readBody, &response); err != nil {
+		log.Println(err.Error())
+		return nil, ErrApplication, 0
+	}
+	return &response.User, nil, resp.StatusCode
 }
