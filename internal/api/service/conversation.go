@@ -2,7 +2,7 @@ package service
 
 import (
 	"context"
-	"github.com/M0hammadUsman/letschat/internal/api/common"
+	"github.com/M0hammadUsman/letschat/internal/api/utility"
 	"github.com/M0hammadUsman/letschat/internal/domain"
 )
 
@@ -21,7 +21,7 @@ func (s *ConversationService) CreateConversation(ctx context.Context, senderID, 
 }
 
 func (s *ConversationService) GetConversations(ctx context.Context) ([]*domain.Conversation, error) {
-	usr := common.ContextGetUser(ctx)
+	usr := utility.ContextGetUser(ctx)
 	if usr == nil {
 		panic("no user was found in the context, Hint: missing Authentication middleware")
 	}

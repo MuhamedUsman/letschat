@@ -2,7 +2,7 @@ package server
 
 import (
 	"errors"
-	"github.com/M0hammadUsman/letschat/internal/api/common"
+	"github.com/M0hammadUsman/letschat/internal/api/utility"
 	"github.com/M0hammadUsman/letschat/internal/domain"
 	"net/http"
 )
@@ -105,7 +105,7 @@ func (s *Server) SearchUserHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) GetCurrentActiveUserHandler(w http.ResponseWriter, r *http.Request) {
-	u := common.ContextGetUser(r.Context())
+	u := utility.ContextGetUser(r.Context())
 	if err := s.writeJSON(w, envelop{"user": u}, http.StatusOK, nil); err != nil {
 		s.serverErrorResponse(w, r, err)
 	}

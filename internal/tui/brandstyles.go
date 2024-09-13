@@ -20,6 +20,9 @@ var ( // Global Styling
 	blackColor             = lipgloss.AdaptiveColor{Light: "#FFFCE4", Dark: "#202020"}
 	darkGreyColor          = lipgloss.AdaptiveColor{Light: "#808080", Dark: "#404040"}
 	lightGreyColor         = lipgloss.AdaptiveColor{Light: "#404040", Dark: "#afafaf"}
+	redColor               = lipgloss.AdaptiveColor{Light: "#FF0000", Dark: "#FF0000"}
+	orangeColor            = lipgloss.AdaptiveColor{Light: "#ffa000", Dark: "#ffa000"}
+	greenColor             = lipgloss.AdaptiveColor{Light: "#00a300", Dark: "#00ff00"}
 
 	letschatLogo = lipgloss.NewStyle().
 			Border(lipgloss.InnerHalfBlockBorder(), true).
@@ -143,7 +146,7 @@ var ( // Tab Container Styling
 	tabGapLeft  = tabGap.Border(lipgloss.Border{Bottom: "─", BottomLeft: "╭", BottomRight: "─"})
 	tabGapRight = tabGap.Border(lipgloss.Border{Bottom: "─", BottomRight: "╮", BottomLeft: "─"})
 
-	statusText = lipgloss.NewStyle().
+	statusTextStyle = lipgloss.NewStyle().
 			Padding(0, 2).
 			Foreground(lightGreyColor).
 			Background(primaryContrastColor).
@@ -223,6 +226,8 @@ var (
 			Bold(true).
 			Margin(1, 3, 0, 3)
 
+	chatHeaderHeight, chatTextareaHeight int // used by ChatModel.chatViewport for its height calculations
+
 	chatViewportStyle = lipgloss.NewStyle()
 
 	chatTxtareaStyle = lipgloss.NewStyle().
@@ -231,6 +236,42 @@ var (
 				BorderForeground(darkGreyColor).
 				Margin(0, 3).
 				Padding(1, 0)
+
+	chatBubbleContainer = lipgloss.NewStyle().
+				Margin(0, 1)
+
+	chatBubbleLBorder = lipgloss.Border{
+		Top:         "─",
+		Bottom:      "─",
+		Left:        "│",
+		Right:       "│",
+		TopLeft:     "╮",
+		TopRight:    "╮",
+		BottomLeft:  "╰",
+		BottomRight: "╯",
+	}
+
+	chatBubbleRBorder = lipgloss.Border{
+		Top:         "─",
+		Bottom:      "─",
+		Left:        "│",
+		Right:       "│",
+		TopLeft:     "╭",
+		TopRight:    "╭",
+		BottomLeft:  "╰",
+		BottomRight: "╯",
+	}
+
+	chatBubbleLStyle = lipgloss.NewStyle().
+				Border(chatBubbleLBorder, true).
+				BorderForeground(whiteColor).
+				Padding(0, 1)
+
+	chatBubbleRStyle = lipgloss.NewStyle().
+				Border(chatBubbleRBorder, true).
+				BorderForeground(primaryColor).
+				Padding(0, 1).
+				Foreground(primaryColor)
 )
 
 var ( // Bunny Stying

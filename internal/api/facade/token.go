@@ -3,9 +3,9 @@ package facade
 import (
 	"context"
 	"errors"
-	"github.com/M0hammadUsman/letschat/internal/api/common"
 	"github.com/M0hammadUsman/letschat/internal/api/mailer"
 	"github.com/M0hammadUsman/letschat/internal/api/service"
+	"github.com/M0hammadUsman/letschat/internal/common"
 	"github.com/M0hammadUsman/letschat/internal/domain"
 	"log/slog"
 )

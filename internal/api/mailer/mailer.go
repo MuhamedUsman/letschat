@@ -3,7 +3,7 @@ package mailer
 import (
 	"bytes"
 	"embed"
-	"github.com/M0hammadUsman/letschat/internal/api/common"
+	"github.com/M0hammadUsman/letschat/internal/api/utility"
 	"gopkg.in/gomail.v2"
 	"html/template"
 )
@@ -16,7 +16,7 @@ type Mailer struct {
 	sender string
 }
 
-func New(cfg *common.Config) *Mailer {
+func New(cfg *utility.Config) *Mailer {
 	return &Mailer{
 		dialer: gomail.NewDialer(cfg.SMTP.Host, cfg.SMTP.Port, cfg.SMTP.Username, cfg.SMTP.Password),
 		sender: cfg.SMTP.Sender,

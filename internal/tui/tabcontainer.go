@@ -1,8 +1,8 @@
 package tui
 
 import (
+	"fmt"
 	"github.com/M0hammadUsman/letschat/internal/client"
-	"github.com/M0hammadUsman/letschat/internal/domain"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/stopwatch"
 	"github.com/charmbracelet/bubbles/timer"
@@ -19,13 +19,13 @@ import (
 // TabContainerModel.spinner will spin with ioStatus until spinnerResetCmd
 var ioStatus string
 
+// TabContainerModel -> main TUI model for this application
 type TabContainerModel struct {
 	discover  DiscoverModel
 	letschat  LetschatModel
 	tabs      []string
 	activeTab int
 	errMsg    *errMsg
-	user      *domain.User
 	timer     timer.Model
 	stopwatch stopwatch.Model
 	spinner   *spinner.Model
@@ -48,13 +48,18 @@ func InitialTabContainerModel() TabContainerModel {
 		timer:     timer.New(0),
 		stopwatch: stopwatch.New(),
 		spinner:   &s,
-
-		client: c,
+		client:    c,
 	}
 }
 
 func (m TabContainerModel) Init() tea.Cmd {
-	return tea.Batch(m.discover.Init(), m.getCurrentActiveUser(), m.stopwatch.Init())
+	return tea.Batch(
+		m.discover.Init(),
+		m.letschat.Init(),
+		m.stopwatch.Init(),
+		m.readOnUsrLoggedInChan(),
+		m.runStartUpProcesses(),
+	)
 }
 
 func (m TabContainerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -67,6 +72,7 @@ func (m TabContainerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c":
+			m.client.BT.Shutdown(5 * time.Second)
 			return m, tea.Quit
 		case "shift+tab":
 			if m.activeTab == len(m.tabs)-1 {
@@ -90,6 +96,14 @@ func (m TabContainerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		default:
 		}
+
+	case client.UsrLoggedIn:
+		// case requireAuthMsg will take over, also we again read On the chan to continue the loop
+		return m, tea.Batch(requireAuthCmd, m.readOnUsrLoggedInChan())
+
+		/*	case client.WsConnState:
+			m.connState = msg
+			return m, m.readOnUsrLoggedInChan() // again read for more changes to socket conn*/
 
 	case requireAuthMsg:
 		loginModel := InitialLoginModel()
@@ -117,16 +131,12 @@ func (m TabContainerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case resetSpinnerMsg:
 		m.resetSpinner()
-
-	case *domain.User:
-		m.user = msg
 	}
 
 	return m, tea.Batch(m.handleChildModelUpdates(msg), m.handleStopwatchUpdate(msg))
 }
 
 func (m TabContainerModel) View() string {
-
 	if m.errMsg != nil {
 		return renderErrContainer(m.errMsg.err, m.errMsg.code, m.timer.View())
 	}
@@ -151,10 +161,11 @@ func (m TabContainerModel) View() string {
 	if ioStatus != "" {
 		s = ioStatus + " " + m.spinner.View()
 	}
-	if m.user != nil {
-		t = renderTabsWithGapsAndText(t, m.user.Name, s)
+	if m.client.CurrentUsr != nil {
+		t = renderTabsWithGapsAndText(t, m.client.CurrentUsr.Name, s, m.client.ConnState)
 	} else {
-		t = renderTabsWithGapsAndText(t, "", s)
+		// conn State will be ignored in this case
+		t = renderTabsWithGapsAndText(t, "", s, m.client.ConnState)
 	}
 	content := m.populateActiveTabContent()
 	c := renderContainerWithTabs(t, content)
@@ -163,16 +174,31 @@ func (m TabContainerModel) View() string {
 
 // Helpers & Stuff -----------------------------------------------------------------------------------------------------
 
-func renderTabsWithGapsAndText(tabs, textL, textR string) string {
+func renderLeftText(txt string, s client.WsConnState) string {
+	is := statusTextStyle
+	switch s {
+	case client.Disconnected:
+		is = is.Foreground(redColor)
+	case client.WaitingForReconnection:
+		is = is.Foreground(redColor).Blink(true)
+	case client.Reconnecting:
+		is = is.Foreground(orangeColor).Blink(true)
+	case client.Connected:
+		is = is.Foreground(greenColor)
+	}
+	return fmt.Sprint(is.Render("●"), statusTextStyle.UnsetPadding().Render(txt), is.Render("●"))
+}
+
+func renderTabsWithGapsAndText(tabs, textL, textR string, state client.WsConnState) string {
 	w := (terminalWidth - lipgloss.Width(tabs) - 4) / 2
-	gapL := tabGapLeft.Width(w).Render(statusText.Render("Letschat"))
+	gapL := tabGapLeft.Width(w).Render(statusTextStyle.Render("Letschat"))
 	// used for divider in conversations tab
 	tabGapLeftWidth = lipgloss.Width(gapL)
-	gapR := tabGapRight.Width(w).Render(statusText.Render(textR))
+	gapR := tabGapRight.Width(w).Render(statusTextStyle.Render(textR))
 	// used for chat container in conversations tab
 	tabGapRightWithTabsWidth = lipgloss.Width(gapR) + lipgloss.Width(tabs)
 	if textL != "" {
-		gapL = tabGapLeft.Width(w).Render(statusText.Render(textL))
+		gapL = tabGapLeft.Width(w).Render(renderLeftText(textL, state))
 	}
 	return lipgloss.JoinHorizontal(lipgloss.Bottom, gapL, tabs, gapR)
 }
@@ -255,12 +281,24 @@ func (m *TabContainerModel) populateActiveTabContent() string {
 	}
 }
 
-func (m *TabContainerModel) getCurrentActiveUser() tea.Cmd {
+// user is not logged in return requireAuthMsg
+func (m TabContainerModel) readOnUsrLoggedInChan() tea.Cmd {
 	return func() tea.Msg {
-		u, _, code := m.client.GetCurrentActiveUser()
-		if code == http.StatusUnauthorized {
-			return requireAuthMsg{}
+		for {
+			select {
+			case flag := <-m.client.UsrLoggedIn:
+				if !flag {
+					return requireAuthMsg{}
+				}
+			}
 		}
-		return u
+	}
+}
+
+// it runs the processes only once, the func this calls is a sync.OnceFunc
+func (m TabContainerModel) runStartUpProcesses() tea.Cmd {
+	return func() tea.Msg {
+		m.client.RunStartupProcesses()
+		return nil
 	}
 }

@@ -71,13 +71,6 @@ func (m *LetschatModel) handleChatUpdate(msg tea.Msg) tea.Cmd {
 
 func (m *LetschatModel) connectWsAndListenForMessages() tea.Cmd {
 	return func() tea.Msg {
-		err, code := m.client.WsConnect()
-		if code == 401 {
-			return requireAuthMsg{}
-		}
-		if err != nil {
-			return errMsg{err: err.Error(), code: code}
-		}
 		msgChan := m.client.ListenForMessages()
 		select {
 		case msg := <-msgChan:

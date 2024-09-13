@@ -44,19 +44,23 @@ func (r *ConversationRepository) GetConversations(ctx context.Context, usrID str
 			WHERE sender_id = $1 OR receiver_id = $1
 			`*/
 	query := `
-		SELECT sender_id, receiver_id,
-        CASE 
-            WHEN sender_id = $1 THEN receiver.name
-            ELSE sender.name
-        END AS display_name,
-        CASE 
-            WHEN sender_id = $1 THEN receiver.email
-            ELSE sender.email
-        END AS display_email,
-        CASE 
-            WHEN sender_id = $1 THEN receiver.last_online
-            ELSE sender.last_online
-        END AS last_online
+		SELECT 
+		    CASE 
+		        WHEN sender_id = $1 THEN receiver_id
+		        ELSE sender_id
+	        END AS user_id,
+	        CASE 
+	            WHEN sender_id = $1 THEN receiver.name
+	            ELSE sender.name
+	        END AS username,
+	        CASE 
+	            WHEN sender_id = $1 THEN receiver.email
+	            ELSE sender.email
+	        END AS user_email,
+	        CASE 
+	            WHEN sender_id = $1 THEN receiver.last_online
+	            ELSE sender.last_online
+	        END AS last_online
 		FROM conversation
 		    INNER JOIN users sender ON sender_id = sender.id
 		    INNER JOIN users receiver ON receiver_id = receiver.id

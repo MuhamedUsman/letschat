@@ -2,7 +2,7 @@ package repository
 
 import (
 	"context"
-	"github.com/M0hammadUsman/letschat/internal/api/common"
+	"github.com/M0hammadUsman/letschat/internal/api/utility"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
 	"time"
@@ -24,7 +24,7 @@ type DB struct {
 	*sqlx.DB
 }
 
-func OpenDB(cfg *common.Config) *DB {
+func OpenDB(cfg *utility.Config) *DB {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	db, err := sqlx.ConnectContext(ctx, "pgx", cfg.DB.DSN)

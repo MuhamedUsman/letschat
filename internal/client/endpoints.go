@@ -6,7 +6,7 @@ const (
 	tokensEndpoint        = "/tokens"
 	messagesEndpoint      = "/messages"
 	conversationsEndpoint = "/conversations"
-	wsBaseUrl             = "ws://localhost:8080/v1"
+	wsBaseUrl             = "ws://localhost:8080"
 	websocketsEndpoint    = "/sub"
 
 	registerUser         = baseUrl + usersEndpoint // POST

@@ -38,10 +38,14 @@ func (k *keyringManager) setAuthTokenInKeyring(label, data string) error {
 	return k.kr.Set(item)
 }
 
-func (k *keyringManager) getAuthTokenFromKeyring() (string, error) {
+func (k *keyringManager) removeAuthTokenFromKeyring() error {
+	return k.kr.Remove(tokenKey)
+}
+
+func (k *keyringManager) getAuthTokenFromKeyring() string {
 	token, err := k.kr.Get(tokenKey)
 	if err != nil {
-		return "", err
+		return ""
 	}
-	return string(token.Data), nil
+	return string(token.Data)
 }

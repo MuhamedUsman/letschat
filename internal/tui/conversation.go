@@ -223,7 +223,6 @@ func (m *ConversationModel) updateConversationWindowSize() {
 
 func (m ConversationModel) getConversations() tea.Cmd {
 	return func() tea.Msg {
-		time.Sleep(3 * time.Second)
 		convos, err, code := m.client.GetConversations()
 		if code == http.StatusUnauthorized {
 			return requireAuthMsg{}
@@ -234,7 +233,7 @@ func (m ConversationModel) getConversations() tea.Cmd {
 		c := make([]list.Item, 0)
 		for i, convo := range convos {
 			id := "item_" + strconv.Itoa(i)
-			item := conversationItem{id, convo.DisplayName, convo.LastOnline.Format(time.Kitchen)}
+			item := conversationItem{id, convo.Username, convo.LastOnline.Format(time.Kitchen)}
 			c = append(c, list.Item(item))
 		}
 		return c

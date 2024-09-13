@@ -3,10 +3,11 @@ package server
 import (
 	"context"
 	"errors"
-	"github.com/M0hammadUsman/letschat/internal/api/common"
+	"github.com/M0hammadUsman/letschat/internal/api/utility"
 	"github.com/M0hammadUsman/letschat/internal/domain"
 	"github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
+	"io"
 	"log/slog"
 	"net/http"
 	"sync"
@@ -28,8 +29,7 @@ func (s *Server) WebsocketSubscribeHandler(w http.ResponseWriter, r *http.Reques
 		}
 		return
 	}
-	defer conn.CloseNow()
-	u := common.ContextGetUser(r.Context())
+	u := utility.ContextGetUser(r.Context())
 
 	s.addSubscriber(u)
 	if err = s.Facade.UpdateUserOnlineStatus(r.Context(), u, true); err != nil {
@@ -41,13 +41,14 @@ func (s *Server) WebsocketSubscribeHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	defer func() {
+		conn.CloseNow()
+		s.removeSubscriber(u)
+		s.broadcastUserOnlineStatus(r.Context(), u, false)
 		for range 5 { // Very unlikely to fail
 			if err = s.Facade.UpdateUserOnlineStatus(r.Context(), u, false); err == nil { // successful case
 				break
 			}
 		}
-		s.broadcastUserOnlineStatus(r.Context(), u, false)
-		s.removeSubscriber(u)
 	}()
 
 	// retrieving unread messages if any
@@ -56,7 +57,7 @@ func (s *Server) WebsocketSubscribeHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	errChan := make(chan error, 2)
+	errChan := make(chan error) // if there is a single err we log and return
 	s.BackgroundTask.Run(func(shtdwnCtx context.Context) {
 		errChan <- s.handleReceivedMessages(shtdwnCtx, r.Context(), conn)
 	})
@@ -64,14 +65,14 @@ func (s *Server) WebsocketSubscribeHandler(w http.ResponseWriter, r *http.Reques
 		errChan <- s.handleSentMessages(shtdwnCtx, r.Context(), conn)
 	})
 
-	for range cap(errChan) {
-		if err = <-errChan; err != nil {
-			if websocket.CloseStatus(err) == websocket.StatusNormalClosure ||
-				websocket.CloseStatus(err) == websocket.StatusGoingAway {
-				return
-			}
-			slog.Error(err.Error())
+	if err = <-errChan; err != nil {
+		if websocket.CloseStatus(err) == websocket.StatusNormalClosure ||
+			websocket.CloseStatus(err) == websocket.StatusAbnormalClosure ||
+			websocket.CloseStatus(err) == websocket.StatusGoingAway ||
+			errors.Is(err, io.EOF) {
+			return
 		}
+		slog.Error(err.Error())
 	}
 }
 
@@ -79,8 +80,8 @@ func (s *Server) subscribe(w http.ResponseWriter, r *http.Request) (*websocket.C
 	var mu sync.Mutex
 	var conn *websocket.Conn
 
-	u := common.ContextGetUser(r.Context()) // User will be authenticated and setup in the context using middleware
-	if _, ok := s.Subscribers[u.ID]; ok {   // multiple online instances of the account are not allowed by design
+	u := utility.ContextGetUser(r.Context()) // User will be authenticated and setup in the context using middleware
+	if _, ok := s.Subscribers[u.ID]; ok {    // multiple online instances of the account are not allowed by design
 		return nil, ErrAlreadySubscribed
 	}
 	u.Messages = make(chan *domain.Message, s.subscriberMessageBuffer)
@@ -91,7 +92,7 @@ func (s *Server) subscribe(w http.ResponseWriter, r *http.Request) (*websocket.C
 			conn.Close(websocket.StatusPolicyViolation, "connection too slow to keep up with messages")
 		}
 	}
-	r = common.ContextSetUser(r, u) // setting back updated user in context
+	r = utility.ContextSetUser(r, u) // setting back updated user in context
 	c, err := websocket.Accept(w, r, s.wsAcceptOpts)
 	if err != nil {
 		return nil, err
@@ -103,7 +104,7 @@ func (s *Server) subscribe(w http.ResponseWriter, r *http.Request) (*websocket.C
 }
 
 func (s *Server) handleReceivedMessages(shutdownCtx, reqCtx context.Context, conn *websocket.Conn) error {
-	u := common.ContextGetUser(reqCtx)
+	u := utility.ContextGetUser(reqCtx)
 	// Listening for messages for this user
 	for {
 		select {
@@ -120,12 +121,11 @@ func (s *Server) handleReceivedMessages(shutdownCtx, reqCtx context.Context, con
 }
 
 func (s *Server) handleSentMessages(shutdownCtx, reqCtx context.Context, conn *websocket.Conn) error {
-	u := common.ContextGetUser(reqCtx)
+	u := utility.ContextGetUser(reqCtx)
 	for {
 		var ms domain.MessageSent
-		if err := wsjson.Read(reqCtx, conn, &ms); err != nil {
-			s.wsInvalidJsonResponse(conn)
-			return errors.Unwrap(err)
+		if err := wsjson.Read(shutdownCtx, conn, &ms); err != nil {
+			return err
 		}
 		// ProcessSentMessage populate the domain.Message and also concurrently persist it to DB with 5 retries
 		msg, err := s.Facade.ProcessSentMessage(reqCtx, ms, u)

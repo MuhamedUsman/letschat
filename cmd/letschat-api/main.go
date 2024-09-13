@@ -1,20 +1,23 @@
 package main
 
 import (
-	common2 "github.com/M0hammadUsman/letschat/internal/api/common"
+	"fmt"
 	"github.com/M0hammadUsman/letschat/internal/api/facade"
 	"github.com/M0hammadUsman/letschat/internal/api/mailer"
 	"github.com/M0hammadUsman/letschat/internal/api/repository"
 	"github.com/M0hammadUsman/letschat/internal/api/server"
 	"github.com/M0hammadUsman/letschat/internal/api/service"
+	"github.com/M0hammadUsman/letschat/internal/api/utility"
+	"github.com/M0hammadUsman/letschat/internal/common"
+	"os"
 )
 
 func main() {
-	common2.ConfigureSlog()
-	cfg := common2.ParseFlags()
+	utility.ConfigureSlog(os.Stderr)
+	cfg := utility.ParseFlags()
 	// Base
 	db := repository.OpenDB(cfg)
-	bgTask := common2.NewBackgroundTask()
+	bgTask := common.NewBackgroundTask()
 	mailr := mailer.New(cfg)
 	// Repositories
 	userRepo := repository.NewUserRepository(db)
@@ -37,5 +40,7 @@ func main() {
 	fac := facade.New(userFacade, tokenFacade, messageFacade, conversationFacade)
 	// Server
 	s := server.NewServer(cfg, bgTask, fac)
+	// printing banner
+	fmt.Println("    __         __            __          __ \n   / /   ___  / /___________/ /_  ____ _/ /_\n  / /   / _ \\/ __/ ___/ ___/ __ \\/ __ `/ __/\n / /___/  __/ /_(__  ) /__/ / / / /_/ / /_  \n/_____/\\___/\\__/____/\\___/_/ /_/\\__,_/\\__/  \n                                            ")
 	s.Serve()
 }

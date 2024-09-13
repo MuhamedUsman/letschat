@@ -1,13 +1,13 @@
 package server
 
 import (
-	"github.com/M0hammadUsman/letschat/internal/api/common"
+	"github.com/M0hammadUsman/letschat/internal/api/utility"
 	"github.com/M0hammadUsman/letschat/internal/domain"
 	"net/http"
 )
 
 func (s *Server) GetPagedMessageHandler(w http.ResponseWriter, r *http.Request) {
-	u := common.ContextGetUser(r.Context())
+	u := utility.ContextGetUser(r.Context())
 	u, ok := s.Subscribers[u.ID]
 	if !ok {
 		s.noSubscriptionResponse(w, r)

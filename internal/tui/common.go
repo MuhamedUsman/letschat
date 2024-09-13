@@ -22,6 +22,10 @@ type doneMsg struct{}
 
 type requireAuthMsg struct{}
 
+func requireAuthCmd() tea.Msg {
+	return requireAuthMsg{}
+}
+
 type spinMsg struct{}
 
 func spinnerSpinCmd() tea.Msg { return spinMsg{} }

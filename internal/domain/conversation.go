@@ -6,14 +6,16 @@ import (
 )
 
 type Conversation struct {
-	SenderID     string `json:"senderID"      db:"sender_id"`
-	ReceiverID   string `json:"receiverID"    db:"receiver_id"`
-	DisplayName  string `json:"displayName"  db:"display_name"`
-	DisplayEmail string `json:"displayEmail"  db:"display_email"`
+	SenderID   string `json:"-"      db:"sender_id"`
+	ReceiverID string `json:"-"    db:"receiver_id"`
+	// Below given attributes will only be used on TUI (frontend side)
+	UserID    string `json:"userID"     db:"user_id"`
+	Username  string `json:"username"  db:"username"`
+	UserEmail string `json:"userEmail"  db:"user_email"`
 	// status of user other than the currently logged-in user, can be either sender or receiver
 	LastOnline *time.Time `json:"lastOnline" db:"last_online"`
 	// latest msg to display under user's name in TUI, only used on frontend side
-	DisplayMsg string `json:"-"`
+	LatestMsg string `json:"-"`
 }
 
 type ConversationService interface {

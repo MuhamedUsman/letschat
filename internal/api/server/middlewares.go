@@ -1,7 +1,7 @@
 package server
 
 import (
-	"github.com/M0hammadUsman/letschat/internal/api/common"
+	"github.com/M0hammadUsman/letschat/internal/api/utility"
 	"github.com/M0hammadUsman/letschat/internal/domain"
 	"net/http"
 	"strings"
@@ -12,7 +12,7 @@ func (s *Server) Authenticate(next http.Handler) http.Handler {
 		w.Header().Set("Vary", "Authorization")
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
-			r = common.ContextSetUser(r, domain.AnonymousUser)
+			r = utility.ContextSetUser(r, domain.AnonymousUser)
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -27,14 +27,14 @@ func (s *Server) Authenticate(next http.Handler) http.Handler {
 			s.invalidAuthenticationTokenResponse(w, r)
 			return
 		}
-		r = common.ContextSetUser(r, usr)
+		r = utility.ContextSetUser(r, usr)
 		next.ServeHTTP(w, r)
 	})
 }
 
 func (s *Server) requireAuthenticatedUser(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		usr := common.ContextGetUser(r.Context())
+		usr := utility.ContextGetUser(r.Context())
 		if usr.IsAnonymousUser() {
 			s.authenticationRequiredResponse(w, r)
 			return
@@ -45,7 +45,7 @@ func (s *Server) requireAuthenticatedUser(next http.Handler) http.Handler {
 
 func (s *Server) requireActivatedUser(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		usr := common.ContextGetUser(r.Context())
+		usr := utility.ContextGetUser(r.Context())
 		if !usr.Activated {
 			s.inactiveAccountResponse(w, r)
 			return

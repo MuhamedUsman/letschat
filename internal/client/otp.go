@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
 )
 
@@ -14,12 +14,12 @@ func (c *Client) ResendOtp(email string) error {
 	}{Email: email}
 	jsonBytes, err := json.Marshal(body)
 	if err != nil {
-		log.Println(err)
+		slog.Error(err.Error())
 		return err
 	}
 	resp, err := http.DefaultClient.Post(generateOTP, "application/json", bytes.NewBuffer(jsonBytes))
 	if err != nil {
-		log.Println(err)
+		slog.Error(err.Error())
 		return err
 	}
 	defer resp.Body.Close()

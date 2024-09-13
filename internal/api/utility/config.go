@@ -1,8 +1,9 @@
-package common
+package utility
 
 import (
 	"flag"
 	"github.com/lmittmann/tint"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -47,16 +48,16 @@ func ParseFlags() *Config {
 	return &cfg
 }
 
-// ConfigureSlog so that it easy to locate the source file & line as the Goland IDE picks up the relative file path
-func ConfigureSlog() {
+// ConfigureSlog so that it easy to locate the source file & line as the Goland IDE picks up the relative file path.
+func ConfigureSlog(writeTo io.Writer) {
 	wd, err := os.Getwd()
 	var tintHandler slog.Handler
 	if err != nil {
 		slog.Error("Unable to find working dir, falling back to default slog Config")
-		tintHandler = tint.NewHandler(os.Stderr, &tint.Options{AddSource: true})
+		tintHandler = tint.NewHandler(writeTo, &tint.Options{AddSource: true})
 	} else {
 		unixPath := filepath.ToSlash(wd)
-		tintHandler = tint.NewHandler(os.Stderr, &tint.Options{
+		tintHandler = tint.NewHandler(writeTo, &tint.Options{
 			AddSource: true,
 			ReplaceAttr: func(groups []string, attr slog.Attr) slog.Attr {
 				if attr.Key == slog.SourceKey {

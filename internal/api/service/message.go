@@ -3,7 +3,7 @@ package service
 import (
 	"context"
 	"errors"
-	"github.com/M0hammadUsman/letschat/internal/api/common"
+	"github.com/M0hammadUsman/letschat/internal/api/utility"
 	"github.com/M0hammadUsman/letschat/internal/domain"
 	"github.com/google/uuid"
 )
@@ -54,7 +54,7 @@ func (s *MessageService) ProcessSentMessages(ctx context.Context, m *domain.Mess
 }
 
 func (s *MessageService) GetUnreadMessages(ctx context.Context, c domain.MsgChan) error {
-	u := common.ContextGetUser(ctx)
+	u := utility.ContextGetUser(ctx)
 	return s.messageRepo.GetUnreadMessages(ctx, u.ID, c)
 }
 
@@ -63,7 +63,7 @@ func (s *MessageService) GetMessagesAsPage(
 	c domain.MsgChan,
 	filter *domain.Filter,
 ) (*domain.Metadata, error) {
-	u := common.ContextGetUser(ctx)
+	u := utility.ContextGetUser(ctx)
 	return s.messageRepo.GetMessagesAsPage(ctx, u.ID, c, filter)
 }
 
