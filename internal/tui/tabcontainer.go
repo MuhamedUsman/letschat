@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 	zone "github.com/lrstanley/bubblezone"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
@@ -72,7 +73,9 @@ func (m TabContainerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c":
-			m.client.BT.Shutdown(5 * time.Second)
+			if err := m.client.BT.Shutdown(5 * time.Second); err != nil {
+				slog.Error(err.Error())
+			}
 			return m, tea.Quit
 		case "shift+tab":
 			if m.activeTab == len(m.tabs)-1 {
@@ -97,13 +100,11 @@ func (m TabContainerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		default:
 		}
 
-	case client.UsrLoggedIn:
-		// case requireAuthMsg will take over, also we again read On the chan to continue the loop
-		return m, tea.Batch(requireAuthCmd, m.readOnUsrLoggedInChan())
-
-		/*	case client.WsConnState:
-			m.connState = msg
-			return m, m.readOnUsrLoggedInChan() // again read for more changes to socket conn*/
+	case client.LoginState:
+		if !msg {
+			// case requireAuthMsg will take over, also we again listen for state change
+			return m, tea.Batch(requireAuthCmd, m.readOnUsrLoggedInChan())
+		}
 
 	case requireAuthMsg:
 		loginModel := InitialLoginModel()
@@ -162,10 +163,10 @@ func (m TabContainerModel) View() string {
 		s = ioStatus + " " + m.spinner.View()
 	}
 	if m.client.CurrentUsr != nil {
-		t = renderTabsWithGapsAndText(t, m.client.CurrentUsr.Name, s, m.client.ConnState)
+		t = renderTabsWithGapsAndText(t, m.client.CurrentUsr.Name, s, m.client.WsConnState.Get())
 	} else {
 		// conn State will be ignored in this case
-		t = renderTabsWithGapsAndText(t, "", s, m.client.ConnState)
+		t = renderTabsWithGapsAndText(t, "", s, m.client.WsConnState.Get())
 	}
 	content := m.populateActiveTabContent()
 	c := renderContainerWithTabs(t, content)
@@ -285,12 +286,7 @@ func (m *TabContainerModel) populateActiveTabContent() string {
 func (m TabContainerModel) readOnUsrLoggedInChan() tea.Cmd {
 	return func() tea.Msg {
 		for {
-			select {
-			case flag := <-m.client.UsrLoggedIn:
-				if !flag {
-					return requireAuthMsg{}
-				}
-			}
+			return m.client.LoginState.WaitForStateChange()
 		}
 	}
 }

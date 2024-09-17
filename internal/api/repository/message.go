@@ -34,11 +34,11 @@ func (r *MessageRepository) GetByID(ctx context.Context, id string) (*domain.Mes
 	return &message, err
 }
 
-func (r *MessageRepository) GetUnreadMessages(ctx context.Context, rcvrID string, c domain.MsgChan) error {
+func (r *MessageRepository) GetUnDeliveredMessages(ctx context.Context, rcvrID string, c domain.MsgChan) error {
 	query := `
 		SELECT *
 		FROM message
-		WHERE receiver_id = $1 AND read_at IS NULL
+		WHERE receiver_id = $1 AND delivered_at IS NULL
 		ORDER BY sent_at
 		`
 	var rows *sqlx.Rows

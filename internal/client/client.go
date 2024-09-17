@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/M0hammadUsman/letschat/internal/client/repository"
@@ -13,27 +14,9 @@ import (
 )
 
 var (
-	once             sync.Once
-	client           *Client
-	runProcessesOnce sync.Once
+	once   sync.Once
+	client *Client
 )
-
-type Conversations map[string][]*domain.Message // key -> userID, val -> list of messages
-
-// WsConnState will be switch cased by tui.TabContainerModel, so making it unique
-type WsConnState int
-
-const (
-	Disconnected WsConnState = iota - 1
-	WaitingForReconnection
-	Reconnecting
-	Connected
-)
-
-type WsConnStateChan chan WsConnState
-
-type UsrLoggedIn bool
-type UsrLoggedInChan chan UsrLoggedIn
 
 type Client struct {
 	// If zero valued -> requires login
@@ -41,17 +24,16 @@ type Client struct {
 	AuthToken string
 	// it's where all the application related files will live on the client side from db, logging anything
 	FilesDir string
-	// will be used by tui.TabContainerModel
-	ConnState WsConnState
-	Repo      *repository.LocalRepository
 	// currently logged-in user we fetch and populates this once there is a read from UsrLogin chan
-	CurrentUsr *domain.User
-	// once the user logs in we can read it from this channel anywhere in the application and do the required stuff
-	// also tui will read the false case and redirects the user to login form
-	// true -> successful login, false -> unauthorized requires login
-	UsrLoggedIn UsrLoggedInChan
-	// only write to this chan once there is successful login
-	//SuccessfulUsrLogin chan struct{}
+	CurrentUsr  *domain.User
+	WsConnState *WsConnMonitor
+	LoginState  *LoginMonitor
+	RecvMsgs    *RecvMsgsMonitor
+	// these are the conversations of the user displayed on the left side of the Conversations tab
+	// once there is a ws conn they will be updated by current online status updates
+	// if the connection is offline they will be fetched by the local db for offline view
+	// we've to wait for state change to get updated conversations, they will be auto updated on WsConnState changes
+	Conversations *ConversationsMonitor
 	// runs the tasks that needs a graceful shutdown, using BackgroundTask.Run
 	BT *common.BackgroundTask
 	// RunStartupProcesses runs long living processes, which dies on shutdown, some chores and
@@ -59,24 +41,18 @@ type Client struct {
 	// initialized in Init func
 	RunStartupProcesses func()
 	// talks to the api for managing native os based credential manager
-	krm *keyringManager
-	// for more info see Client.AttemptWsReconnectOnDisconnect, must be buffered
-	wsConnStatus WsConnStateChan
-	// every message will be written to this channel by websocket.Conn so we can read it from here
-	messages domain.MsgChan
-	// these are the conversations of the user displayed on the left side of the Conversations tab
-	// once there is a ws conn they will be updated by current online status updates
-	// if the connection is offline they will be fetched by the local db for offline view
-	conversations Conversations
+	krm      *keyringManager
+	sentMsgs sentMsgs
 	// wrapper around *sqlx.DB
 	db *repository.DB
 	// directory to store application related files on client side, determined on startup for respected OS
 	// supported OS -> windows, mac, linux
+	repo *repository.LocalRepository
 }
 
 // Init initializes Storage Dirs, keyringManager to support access token storage at OS level,
 // also opens a connection to sqlite DB, runs idempotent migrations, starts a goroutine to listen for user login,
-// a goroutine to connect to Ws and listen for messages
+// a goroutine to connect to Ws and listen for recvMsgs
 // to get instance to a client use Get
 func Init() error {
 	var c Client
@@ -88,40 +64,40 @@ func Init() error {
 			return
 		}
 		c.AuthToken = c.krm.getAuthTokenFromKeyring()
-		c.messages = make(domain.MsgChan, 16)
 		c.BT = common.NewBackgroundTask()
-		//c.UsrLoggedIn = true // we assume user is logged in, proved otherwise
-		c.UsrLoggedIn = make(chan UsrLoggedIn)
-		//c.SuccessfulUsrLogin = make(chan struct{})
-		c.wsConnStatus = make(WsConnStateChan, 1)
+		c.WsConnState = newWsConnMonitor()
+		c.LoginState = newLoginMonitor()
+		c.Conversations = newConversationsMonitor()
+		c.RecvMsgs = newRecvMsgsStateMonitor()
 		// Connecting to sqlite
 		c.db, err = repository.OpenDB(c.FilesDir)
 		if err != nil {
 			return
 		}
-		c.Repo = repository.NewLocalRepository(c.db)
+		c.repo = repository.NewLocalRepository(c.db)
 		// Running idempotent migrations
 		err = c.db.RunMigrations()
 	})
 	if err != nil {
-		if c.db != nil {
-			_ = c.db.Close()
-		}
 		return err
 	}
 	c.RunStartupProcesses = sync.OnceFunc(func() {
-		go c.ListenForUserLogin()
-		go c.AttemptWsReconnectOnDisconnect()
-		go c.WsConnectAndListenForMessages()
-		u, err := c.Repo.GetCurrentUser()
+		c.BT.Run(func(shtdwnCtx context.Context) { c.LoginState.Broadcast(shtdwnCtx) })
+		c.BT.Run(func(shtdwnCtx context.Context) { c.WsConnState.Broadcast(shtdwnCtx) })
+		c.BT.Run(func(shtdwnCtx context.Context) { c.Conversations.Broadcast(shtdwnCtx) })
+		c.BT.Run(func(shtdwnCtx context.Context) { c.manageUserLogins(shtdwnCtx) })
+		c.BT.Run(func(shtdwnCtx context.Context) { c.attemptWsReconnectOnDisconnect(shtdwnCtx) })
+		c.BT.Run(func(shtdwnCtx context.Context) { c.wsConnectAndListenForMessages(shtdwnCtx) })
+		c.BT.Run(func(shtdwnCtx context.Context) { c.populateConversationsAccordingToWsConnState(shtdwnCtx) })
+		u, err := c.repo.GetCurrentUser()
 		if err != nil {
 			if errors.Is(err, domain.ErrRecordNotFound) {
 				// as we cannot find the user in the db, user needs to log in again so
 				// tui.TabContainerModel can redirect user to log-in page
-				c.UsrLoggedIn <- false
+				c.LoginState.WriteToChan(false)
 			}
 		}
-		client.CurrentUsr = u
+		c.CurrentUsr = u
 	})
 	client = &c
 	return nil
@@ -130,10 +106,6 @@ func Init() error {
 // Get returns singleton instance of a Client
 func Get() *Client {
 	return client
-}
-
-func (c *Client) ListenForMessages() domain.MsgChan {
-	return c.messages
 }
 
 // Helpers & Stuff -----------------------------------------------------------------------------------------------------

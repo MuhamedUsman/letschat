@@ -200,6 +200,10 @@ func (s *UserService) GetByQuery(
 	return s.userRepository.GetByQuery(ctx, paramName, queryParam, filter)
 }
 
+func (s *UserService) SetOnlineUsersLastSeen(ctx context.Context, t time.Time) error {
+	return s.userRepository.SetOnlineUsersLastSeen(ctx, t)
+}
+
 func generatePasswordHash(plainPassword string) ([]byte, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(plainPassword), 12)
 	if err != nil {

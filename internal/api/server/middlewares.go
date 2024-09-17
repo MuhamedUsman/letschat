@@ -1,13 +1,14 @@
 package server
 
 import (
+	"fmt"
 	"github.com/M0hammadUsman/letschat/internal/api/utility"
 	"github.com/M0hammadUsman/letschat/internal/domain"
 	"net/http"
 	"strings"
 )
 
-func (s *Server) Authenticate(next http.Handler) http.Handler {
+func (s *Server) authenticate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Vary", "Authorization")
 		authHeader := r.Header.Get("Authorization")
@@ -50,6 +51,18 @@ func (s *Server) requireActivatedUser(next http.Handler) http.Handler {
 			s.inactiveAccountResponse(w, r)
 			return
 		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (s *Server) recoverPanic(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if err := recover(); err != nil {
+				w.Header().Set("Connection", "close")
+				s.serverErrorResponse(w, r, fmt.Errorf("%v", err))
+			}
+		}()
 		next.ServeHTTP(w, r)
 	})
 }

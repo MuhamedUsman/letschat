@@ -4,7 +4,7 @@ const (
 	baseUrl               = "http://localhost:8080/v1"
 	usersEndpoint         = "/users"
 	tokensEndpoint        = "/tokens"
-	messagesEndpoint      = "/messages"
+	messagesEndpoint      = "/recvMsgs"
 	conversationsEndpoint = "/conversations"
 	wsBaseUrl             = "ws://localhost:8080"
 	websocketsEndpoint    = "/sub"

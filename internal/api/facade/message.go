@@ -47,8 +47,8 @@ func (f *MessageFacade) ProcessSentMessage(ctx context.Context,
 	return msg, nil
 }
 
-func (f *MessageFacade) WriteUnreadMessagesToWSConn(ctx context.Context, c domain.MsgChan) error {
-	return f.service.GetUnreadMessages(ctx, c)
+func (f *MessageFacade) WriteUnDeliveredMessagesToWSConn(ctx context.Context, c domain.MsgChan) error {
+	return f.service.GetUnDeliveredMessages(ctx, c)
 }
 
 func (f *MessageFacade) WritePagedMessagesToWSConn(

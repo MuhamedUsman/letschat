@@ -31,18 +31,6 @@ func (r *ConversationRepository) CreateConversation(ctx context.Context, senderI
 }
 
 func (r *ConversationRepository) GetConversations(ctx context.Context, usrID string) ([]*domain.Conversation, error) {
-	/*query := `
-			SELECT sender_id, sender.name sender_name, sender.email sender_email,
-	            receiver_id, receiver.name receiver_name, receiver.email receiver_email,
-	            CASE
-	                WHEN sender_id = $1 THEN sender.last_online
-	                ELSE receiver.last_online
-	                END AS last_online
-			FROM conversation
-			    INNER JOIN users sender ON sender_id = sender.id
-			    INNER JOIN users receiver ON receiver_id = receiver.id
-			WHERE sender_id = $1 OR receiver_id = $1
-			`*/
 	query := `
 		SELECT 
 		    CASE 
@@ -88,14 +76,9 @@ func (r *ConversationRepository) GetConversations(ctx context.Context, usrID str
 
 func (r *ConversationRepository) ConversationExists(ctx context.Context, senderID, receiverID string) (bool, error) {
 	query := `
-		SELECT CASE
-	    WHEN EXISTS (
-		    SELECT FROM conversation 
-	        WHERE sender_id = $1 AND receiver_id = $1
-        )
-	    THEN TRUE 
-	    ELSE FALSE 
-	    END
+		SELECT COUNT(*) > 0 -- must be a single record
+		FROM conversation 
+		WHERE (sender_id = $1 AND receiver_id = $2) OR (sender_id = $2 AND receiver_id = $1)
         `
 	var exists bool
 	var err error

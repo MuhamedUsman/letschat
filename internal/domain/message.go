@@ -37,7 +37,7 @@ type MsgChan chan *Message
 type MessageService interface {
 	PopulateMessage(m MessageSent, sndr *User) *Message
 	ProcessSentMessages(ctx context.Context, m *Message) error
-	GetUnreadMessages(ctx context.Context, c MsgChan) error
+	GetUnDeliveredMessages(ctx context.Context, c MsgChan) error
 	GetMessagesAsPage(ctx context.Context, c MsgChan, filter *Filter) (*Metadata, error)
 	SaveMessage(ctx context.Context, m *Message) error
 	UpdateMessage(ctx context.Context, m *Message) error
@@ -46,7 +46,7 @@ type MessageService interface {
 
 type MessageRepository interface {
 	GetByID(ctx context.Context, id string) (*Message, error)
-	GetUnreadMessages(ctx context.Context, rcvrID string, c MsgChan) error
+	GetUnDeliveredMessages(ctx context.Context, rcvrID string, c MsgChan) error
 	GetMessagesAsPage(ctx context.Context, rcvrID string, c MsgChan, filter *Filter) (*Metadata, error)
 	InsertMessage(ctx context.Context, m *Message) error
 	UpdateMessage(ctx context.Context, m *Message) error

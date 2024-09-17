@@ -43,9 +43,11 @@ func (k *keyringManager) removeAuthTokenFromKeyring() error {
 }
 
 func (k *keyringManager) getAuthTokenFromKeyring() string {
-	token, err := k.kr.Get(tokenKey)
+	/*token, err := k.kr.Get(tokenKey)
 	if err != nil {
 		return ""
 	}
-	return string(token.Data)
+	return string(token.Data)*/
+	//return "KPI52LRNXCYMKRDBJRE4TUC7L4"
+	return "LTEBF5ZJ3K5RPZ7AFZTUWUVNPA"
 }

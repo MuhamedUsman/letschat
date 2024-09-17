@@ -7,6 +7,7 @@ import (
 	"github.com/M0hammadUsman/letschat/internal/common"
 	"github.com/M0hammadUsman/letschat/internal/domain"
 	"log/slog"
+	"time"
 )
 
 type UserFacade struct {
@@ -85,4 +86,8 @@ func (f *UserFacade) SearchUser(
 	filter domain.Filter,
 ) ([]*domain.User, *domain.Metadata, error) {
 	return f.service.GetByQuery(ctx, queryParam, filter)
+}
+
+func (f *UserFacade) SetOnlineUsersLastSeen(ctx context.Context) error {
+	return f.service.SetOnlineUsersLastSeen(ctx, time.Now())
 }

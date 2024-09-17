@@ -34,6 +34,11 @@ func (m LetschatModel) Init() tea.Cmd {
 
 func (m LetschatModel) Update(msg tea.Msg) (LetschatModel, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "ctrl+s":
+			return m, tea.Batch(m.sendMessage(), m.handleConversationUpdate(msg), m.handleChatUpdate(msg))
+		}
 	case tea.MouseMsg:
 		if zone.Get(letschatConversation).InBounds(msg) {
 			m.conversation.focus = true
@@ -44,6 +49,7 @@ func (m LetschatModel) Update(msg tea.Msg) (LetschatModel, tea.Cmd) {
 			m.conversation.focus = false
 		}
 	}
+	m.chat.selConvoUsername = m.conversation.selConvoUsername
 	return m, tea.Batch(m.handleConversationUpdate(msg), m.handleChatUpdate(msg))
 }
 
@@ -69,12 +75,25 @@ func (m *LetschatModel) handleChatUpdate(msg tea.Msg) tea.Cmd {
 	return cmd
 }
 
-func (m *LetschatModel) connectWsAndListenForMessages() tea.Cmd {
+// Helpers & Stuff -----------------------------------------------------------------------------------------------------
+
+func (m *LetschatModel) sendMessage() tea.Cmd {
+	msg := m.chat.chatTxtarea.Value()
 	return func() tea.Msg {
-		msgChan := m.client.ListenForMessages()
-		select {
-		case msg := <-msgChan:
-			return msg
+		msg, _ := m.client.SendMessage(msg, m.conversation.getSelConvoUsrID())
+		if msg != nil {
+			// TODO: Not Complete
 		}
+		return nil
 	}
 }
+
+/*func (m *LetschatModel) handleMessage() tea.Cmd {
+	return func() tea.Msg {
+		msg := m.client.RecvMsgs.WaitForStateChange()
+		switch msg.Operation {
+		case domain.CreateMsg:
+
+		}
+	}
+}*/

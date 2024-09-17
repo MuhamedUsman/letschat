@@ -9,6 +9,7 @@ import (
 	"github.com/M0hammadUsman/letschat/internal/api/service"
 	"github.com/M0hammadUsman/letschat/internal/api/utility"
 	"github.com/M0hammadUsman/letschat/internal/common"
+	"log/slog"
 	"os"
 )
 
@@ -42,5 +43,9 @@ func main() {
 	s := server.NewServer(cfg, bgTask, fac)
 	// printing banner
 	fmt.Println("    __         __            __          __ \n   / /   ___  / /___________/ /_  ____ _/ /_\n  / /   / _ \\/ __/ ___/ ___/ __ \\/ __ `/ __/\n / /___/  __/ /_(__  ) /__/ / / / /_/ / /_  \n/_____/\\___/\\__/____/\\___/_/ /_/\\__,_/\\__/  \n                                            ")
-	s.Serve()
+	// Starting Server and setting up cleanup processes
+	s.ShutdownCleanup() // will run once the server shutdown initiates
+	if err := s.Serve(); err != nil {
+		slog.Error(err.Error())
+	}
 }

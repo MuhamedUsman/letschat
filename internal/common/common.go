@@ -17,6 +17,7 @@ type BackgroundTask struct {
 	wg     sync.WaitGroup
 	ctx    context.Context
 	cancel context.CancelFunc
+	Tasks  int
 }
 
 func NewBackgroundTask() *BackgroundTask {
@@ -32,9 +33,11 @@ func NewBackgroundTask() *BackgroundTask {
 
 func (bt *BackgroundTask) Run(fn func(shtdwnCtx context.Context)) {
 	bt.wg.Add(1)
+	bt.Tasks++
 	go func() {
-		defer bt.wg.Done()
 		defer func() {
+			bt.wg.Done()
+			bt.Tasks--
 			if r := recover(); r != nil {
 				slog.Error(fmt.Errorf("%v", r).Error())
 			}
@@ -43,7 +46,7 @@ func (bt *BackgroundTask) Run(fn func(shtdwnCtx context.Context)) {
 	}()
 }
 
-func (bt *BackgroundTask) Shutdown(timeout time.Duration) {
+func (bt *BackgroundTask) Shutdown(timeout time.Duration) error {
 	bt.cancel()
 	wait := make(chan struct{})
 	go func() {
@@ -52,8 +55,8 @@ func (bt *BackgroundTask) Shutdown(timeout time.Duration) {
 	}()
 	select {
 	case <-wait:
-		return
+		return nil
 	case <-time.After(timeout):
-		slog.Warn("Shutdown timeout, some tasks may not have finished")
+		return fmt.Errorf("shutdown timeout, some background tasks may not have finished")
 	}
 }

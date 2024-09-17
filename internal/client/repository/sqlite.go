@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3"
+	"os"
 	"path/filepath"
 	"time"
 )
@@ -55,7 +56,14 @@ func OpenDB(filesDir string) (*DB, error) {
 		db.SetMaxIdleConns(5)
 		db.SetConnMaxIdleTime(15 * time.Minute)
 	}
+	if err != nil && db != nil {
+		db.Close()
+	}
 	return &DB{db}, err
+}
+
+func DeleteDBFile(filesDir string) error {
+	return os.Remove(filepath.Join(filesDir, "Letschat.db"))
 }
 
 func (db *DB) RunMigrations() error {

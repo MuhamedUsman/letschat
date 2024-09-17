@@ -35,6 +35,7 @@ type UserService interface {
 	ActivateUser(ctx context.Context, user *User) error
 	AuthenticateUser(ctx context.Context, u *UserAuth) (string, error)
 	GetByQuery(ctx context.Context, queryParam string, filter Filter) ([]*User, *Metadata, error)
+	SetOnlineUsersLastSeen(ctx context.Context, t time.Time) error
 }
 
 type UserRepository interface {
@@ -45,6 +46,7 @@ type UserRepository interface {
 	GetForToken(ctx context.Context, scope string, hash []byte) (*User, error)
 	ActivateUser(ctx context.Context, user *User) error
 	GetByQuery(ctx context.Context, paramName string, paramValue string, filter Filter) ([]*User, *Metadata, error)
+	SetOnlineUsersLastSeen(ctx context.Context, t time.Time) error
 }
 
 // DTOs

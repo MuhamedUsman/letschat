@@ -2,14 +2,26 @@ package client
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
+	"github.com/M0hammadUsman/letschat/internal/client/repository"
+	"github.com/M0hammadUsman/letschat/internal/client/sync"
 	"github.com/M0hammadUsman/letschat/internal/domain"
 	"io"
+	"log"
 	"log/slog"
 	"net/http"
 	"strconv"
 )
+
+// LoginState true -> successful login, false -> unauthorized requires login
+type LoginState bool
+type LoginMonitor = sync.StateMonitor[LoginState]
+
+func newLoginMonitor() *LoginMonitor {
+	return sync.NewStatus[LoginState](false)
+}
 
 // Register will register the user & populate the *domain.UserRegister with validation errors
 // in case of http.StatusUnprocessableEntity
@@ -93,7 +105,7 @@ func (c *Client) Login(u domain.UserAuth) error {
 		return err
 	}
 	// signal an authenticated user
-	c.UsrLoggedIn <- true
+	c.LoginState.WriteToChan(true)
 	return nil
 }
 
@@ -177,24 +189,45 @@ func (c *Client) GetCurrentActiveUser() (*domain.User, error, int) {
 	return &response.User, nil, resp.StatusCode
 }
 
-// ListenForUserLogin listen on Client.UsrLogin chan, and on user login saves the user to db,
-// the sender to client.UsrLogin chan will be tui.LoginModel.login method
-// does this while deleting previous user if any
-func (c *Client) ListenForUserLogin() {
+// ManageUserLogins listens for state change on LoginMonitor, and on user login saves the user to db,
+// if the user is not the one previously in the db, it will delete the db and creates a new one
+// ensuring brand-new db for a newly logged-in user, does this while deleting previous user if any
+func (c *Client) manageUserLogins(shtdwnCtx context.Context) {
 	for {
+		s := c.LoginState.WaitForStateChange()
 		select {
-		case flag := <-c.UsrLoggedIn:
-			if !flag {
-				continue
+		case <-shtdwnCtx.Done():
+			return
+		default:
+		}
+		if !s {
+			continue
+		}
+		u, _, _ := c.GetCurrentActiveUser()
+		c.CurrentUsr = u
+		retrievedUsr, _ := c.repo.GetCurrentUser() // ignore the error
+		// delete the previous db
+		if retrievedUsr != nil && retrievedUsr.ID != u.ID {
+			// ignore the error as it will be related to path meaning it can't be able to find the file
+			// in this case we'll still be creating a new DB file
+			_ = repository.DeleteDBFile(c.FilesDir)
+			// Opening a new conn to sqlite db will create a new file
+			db, err := repository.OpenDB(c.FilesDir)
+			// very unlikely but if happens, there is no reason to continue normal application execution
+			if err != nil {
+				log.Fatal(err)
 			}
-			u, _, _ := c.GetCurrentActiveUser()
-			c.CurrentUsr = u
-			if err := c.Repo.DeletePreviousUser(); err != nil {
+			c.db = db
+			if err = c.db.RunMigrations(); err != nil {
+				log.Fatal(err)
+			}
+		} else {
+			if err := c.repo.DeletePreviousUser(); err != nil {
 				slog.Error("unable to delete previous user", "err", err.Error())
 			}
-			if err := c.Repo.SaveCurrentUser(u); err != nil {
-				slog.Error("unable to save current user to local repo", "err", err.Error())
-			}
+		}
+		if err := c.repo.SaveCurrentUser(u); err != nil {
+			slog.Error("unable to save current user to local repo", "err", err.Error())
 		}
 	}
 }

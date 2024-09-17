@@ -66,7 +66,7 @@ func (m DiscoverModel) Update(msg tea.Msg) (DiscoverModel, tea.Cmd) {
 		case "up", "down":
 			m.focusIdx = 1
 		case "enter":
-			if m.focusIdx == 0 {
+			if m.focusIdx == 0 && m.focus {
 				if utf8.RuneCountInString(m.searchTxtInput.Value()) > 0 {
 					m.table.SetRows(nil) // clearing any previous records
 					ioStatus = "Searching"

@@ -40,39 +40,48 @@ func (s *Server) WebsocketSubscribeHandler(w http.ResponseWriter, r *http.Reques
 		s.serverErrorResponse(w, r, err)
 		return
 	}
-	defer func() {
-		conn.CloseNow()
-		s.removeSubscriber(u)
-		s.broadcastUserOnlineStatus(r.Context(), u, false)
-		for range 5 { // Very unlikely to fail
-			if err = s.Facade.UpdateUserOnlineStatus(r.Context(), u, false); err == nil { // successful case
-				break
-			}
-		}
-	}()
-
-	// retrieving unread messages if any
-	if err = s.Facade.WriteUnreadMessagesToWSConn(r.Context(), u.Messages); err != nil {
+	if err = s.Facade.WriteUnDeliveredMessagesToWSConn(r.Context(), u.Messages); err != nil {
 		slog.Error(err.Error())
 		return
 	}
-
-	errChan := make(chan error) // if there is a single err we log and return
+	defer s.WebsocketSubscribeHandlerDeferFunc(r.Context(), conn)
+	// buffered because if there is any error we'll return so we don't want the other writes to block
+	errChan := make(chan error, 1) // if there is a single err we log and return
+	reqCtx, cancel := context.WithCancel(r.Context())
+	defer cancel()
 	s.BackgroundTask.Run(func(shtdwnCtx context.Context) {
-		errChan <- s.handleReceivedMessages(shtdwnCtx, r.Context(), conn)
+		errChan <- s.handleReceivedMessages(shtdwnCtx, reqCtx, conn)
 	})
 	s.BackgroundTask.Run(func(shtdwnCtx context.Context) {
-		errChan <- s.handleSentMessages(shtdwnCtx, r.Context(), conn)
+		errChan <- s.handleSentMessages(shtdwnCtx, reqCtx, conn)
 	})
 
 	if err = <-errChan; err != nil {
+		// Once there is an error from one of the background tasks,
+		// means the Ws connection is closed so we cancel the reqCtx
+		// so the other background task can exit listening on it
+		cancel()
 		if websocket.CloseStatus(err) == websocket.StatusNormalClosure ||
 			websocket.CloseStatus(err) == websocket.StatusAbnormalClosure ||
 			websocket.CloseStatus(err) == websocket.StatusGoingAway ||
-			errors.Is(err, io.EOF) {
+			errors.Is(err, io.EOF) ||
+			errors.Is(err, context.Canceled) {
 			return
 		}
 		slog.Error(err.Error())
+	}
+}
+
+// WebsocketSubscribeHandlerDeferFunc sets the user's LastOnline to time.Now
+func (s *Server) WebsocketSubscribeHandlerDeferFunc(reqCtx context.Context, conn *websocket.Conn) {
+	u := utility.ContextGetUser(reqCtx)
+	s.broadcastUserOnlineStatus(reqCtx, u, false)
+	s.removeSubscriber(u)
+	conn.CloseNow()
+	for range 5 { // Very unlikely to fail
+		if err := s.Facade.UpdateUserOnlineStatus(reqCtx, u, false); err == nil { // successful case
+			break
+		}
 	}
 }
 
@@ -110,10 +119,13 @@ func (s *Server) handleReceivedMessages(shutdownCtx, reqCtx context.Context, con
 		select {
 		case msg := <-u.Messages:
 			if s.publishLimiter.Allow() {
-				if err := writeWithTimeout(conn, 5*time.Second, msg); err != nil {
+				if err := writeWithTimeout(conn, 2*time.Second, msg); err != nil {
+					slog.Error(err.Error())
 					return err
 				}
 			}
+		case <-reqCtx.Done():
+			return nil
 		case <-shutdownCtx.Done():
 			return nil
 		}
@@ -124,6 +136,7 @@ func (s *Server) handleSentMessages(shutdownCtx, reqCtx context.Context, conn *w
 	u := utility.ContextGetUser(reqCtx)
 	for {
 		var ms domain.MessageSent
+		// read will immediately errors out once the client shuts the Ws connection
 		if err := wsjson.Read(shutdownCtx, conn, &ms); err != nil {
 			return err
 		}
@@ -141,6 +154,8 @@ func (s *Server) handleSentMessages(shutdownCtx, reqCtx context.Context, conn *w
 			select {
 			case relayTo.Messages <- msg:
 			case <-shutdownCtx.Done():
+				return nil
+			case <-reqCtx.Done():
 				return nil
 			default:
 				u.CloseSlow()
@@ -171,10 +186,6 @@ func (s *Server) broadcastUserOnlineStatus(ctx context.Context, u *domain.User, 
 		if convo.LastOnline != nil { // meaning the user is not online
 			continue
 		}
-		targetUserID := convo.ReceiverID
-		if targetUserID == u.ID {
-			targetUserID = convo.SenderID
-		}
 		t := time.Now()
 		op := domain.UserOfflineMsg
 		if online {
@@ -185,7 +196,7 @@ func (s *Server) broadcastUserOnlineStatus(ctx context.Context, u *domain.User, 
 			SentAt:    &t,
 			Operation: op,
 		}
-		s.Subscribers[targetUserID].Messages <- &msg
+		s.Subscribers[convo.UserID].Messages <- &msg
 	}
 	return nil
 }

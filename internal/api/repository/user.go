@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jmoiron/sqlx"
 	"log/slog"
+	"time"
 )
 
 var _ domain.UserRepository = (*UserRepository)(nil)
@@ -205,4 +206,19 @@ func (r *UserRepository) GetByQuery(
 	}
 	metadata := domain.CalculateMetadata(total, filter.PageSize, filter.Page)
 	return users, &metadata, nil
+}
+
+func (r *UserRepository) SetOnlineUsersLastSeen(ctx context.Context, t time.Time) error {
+	query := `
+		UPDATE users 
+		SET last_online = $1
+		WHERE last_online IS NULL
+	`
+	var err error
+	if tx := contextGetTX(ctx); tx != nil {
+		_, err = tx.ExecContext(ctx, query, t)
+	} else {
+		_, err = r.db.ExecContext(ctx, query, t)
+	}
+	return err
 }

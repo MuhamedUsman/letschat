@@ -53,9 +53,9 @@ func (s *MessageService) ProcessSentMessages(ctx context.Context, m *domain.Mess
 	}
 }
 
-func (s *MessageService) GetUnreadMessages(ctx context.Context, c domain.MsgChan) error {
+func (s *MessageService) GetUnDeliveredMessages(ctx context.Context, c domain.MsgChan) error {
 	u := utility.ContextGetUser(ctx)
-	return s.messageRepo.GetUnreadMessages(ctx, u.ID, c)
+	return s.messageRepo.GetUnDeliveredMessages(ctx, u.ID, c)
 }
 
 func (s *MessageService) GetMessagesAsPage(
