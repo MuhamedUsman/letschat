@@ -11,10 +11,11 @@ var (
 )
 
 type keyringManager struct {
-	kr keyring.Keyring
+	kr  keyring.Keyring
+	key int
 }
 
-func newKeyringManager() (*keyringManager, error) {
+func newKeyringManager(key int) (*keyringManager, error) {
 	cfg := keyring.Config{
 		ServiceName:             serviceName,
 		KeyCtlScope:             "user",
@@ -25,7 +26,7 @@ func newKeyringManager() (*keyringManager, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &keyringManager{kr: kr}, nil
+	return &keyringManager{kr: kr, key: key}, nil
 }
 
 func (k *keyringManager) setAuthTokenInKeyring(label, data string) error {
@@ -48,6 +49,10 @@ func (k *keyringManager) getAuthTokenFromKeyring() string {
 		return ""
 	}
 	return string(token.Data)*/
-	//return "KPI52LRNXCYMKRDBJRE4TUC7L4"
-	return "LTEBF5ZJ3K5RPZ7AFZTUWUVNPA"
+	if k.key == 1 {
+		return "GUQN537LHKSBFGVIKWDRX4OVVQ"
+	} else if k.key == 2 {
+		return "CADIW626IRRD67XM7N4XXCPTYA"
+	}
+	return ""
 }

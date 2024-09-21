@@ -54,12 +54,12 @@ type Client struct {
 // also opens a connection to sqlite DB, runs idempotent migrations, starts a goroutine to listen for user login,
 // a goroutine to connect to Ws and listen for recvMsgs
 // to get instance to a client use Get
-func Init() error {
+func Init(key int) error {
 	var c Client
 	var err error
 	once.Do(func() {
 		c.FilesDir, err = getAppStoragePath(appName)
-		c.krm, err = newKeyringManager()
+		c.krm, err = newKeyringManager(key) // TODO: remove key
 		if err != nil {
 			return
 		}
@@ -70,7 +70,7 @@ func Init() error {
 		c.Conversations = newConversationsMonitor()
 		c.RecvMsgs = newRecvMsgsStateMonitor()
 		// Connecting to sqlite
-		c.db, err = repository.OpenDB(c.FilesDir)
+		c.db, err = repository.OpenDB(c.FilesDir, key)
 		if err != nil {
 			return
 		}
@@ -85,6 +85,8 @@ func Init() error {
 		c.BT.Run(func(shtdwnCtx context.Context) { c.LoginState.Broadcast(shtdwnCtx) })
 		c.BT.Run(func(shtdwnCtx context.Context) { c.WsConnState.Broadcast(shtdwnCtx) })
 		c.BT.Run(func(shtdwnCtx context.Context) { c.Conversations.Broadcast(shtdwnCtx) })
+		c.BT.Run(func(shtdwnCtx context.Context) { c.RecvMsgs.Broadcast(shtdwnCtx) })
+		c.BT.Run(func(shtdwnCtx context.Context) { c.handleReceivedMsgs(shtdwnCtx) })
 		c.BT.Run(func(shtdwnCtx context.Context) { c.manageUserLogins(shtdwnCtx) })
 		c.BT.Run(func(shtdwnCtx context.Context) { c.attemptWsReconnectOnDisconnect(shtdwnCtx) })
 		c.BT.Run(func(shtdwnCtx context.Context) { c.wsConnectAndListenForMessages(shtdwnCtx) })

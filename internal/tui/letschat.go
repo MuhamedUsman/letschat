@@ -12,6 +12,10 @@ const (
 	letschatChat         = "letschatChat"
 )
 
+var (
+	selUserID, selUsername string // selected user from conversations
+)
+
 type LetschatModel struct {
 	conversation ConversationModel
 	chat         ChatModel
@@ -23,7 +27,7 @@ type LetschatModel struct {
 func InitialLetschatModel(c *client.Client) LetschatModel {
 	return LetschatModel{
 		conversation: InitialConversationModel(c),
-		chat:         InitialChatModel(),
+		chat:         InitialChatModel(c),
 		client:       c,
 	}
 }
@@ -34,11 +38,6 @@ func (m LetschatModel) Init() tea.Cmd {
 
 func (m LetschatModel) Update(msg tea.Msg) (LetschatModel, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.String() {
-		case "ctrl+s":
-			return m, tea.Batch(m.sendMessage(), m.handleConversationUpdate(msg), m.handleChatUpdate(msg))
-		}
 	case tea.MouseMsg:
 		if zone.Get(letschatConversation).InBounds(msg) {
 			m.conversation.focus = true
@@ -49,7 +48,6 @@ func (m LetschatModel) Update(msg tea.Msg) (LetschatModel, tea.Cmd) {
 			m.conversation.focus = false
 		}
 	}
-	m.chat.selConvoUsername = m.conversation.selConvoUsername
 	return m, tea.Batch(m.handleConversationUpdate(msg), m.handleChatUpdate(msg))
 }
 
@@ -76,17 +74,6 @@ func (m *LetschatModel) handleChatUpdate(msg tea.Msg) tea.Cmd {
 }
 
 // Helpers & Stuff -----------------------------------------------------------------------------------------------------
-
-func (m *LetschatModel) sendMessage() tea.Cmd {
-	msg := m.chat.chatTxtarea.Value()
-	return func() tea.Msg {
-		msg, _ := m.client.SendMessage(msg, m.conversation.getSelConvoUsrID())
-		if msg != nil {
-			// TODO: Not Complete
-		}
-		return nil
-	}
-}
 
 /*func (m *LetschatModel) handleMessage() tea.Cmd {
 	return func() tea.Msg {

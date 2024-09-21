@@ -33,3 +33,7 @@ func spinnerSpinCmd() tea.Msg { return spinMsg{} }
 type resetSpinnerMsg struct{}
 
 func spinnerResetCmd() tea.Msg { return resetSpinnerMsg{} }
+
+type selDiscUserMsg struct { // selected Discovered User Msg
+	id, name, email string
+}

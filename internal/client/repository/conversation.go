@@ -1,6 +1,10 @@
 package repository
 
-import "github.com/M0hammadUsman/letschat/internal/domain"
+import (
+	"database/sql"
+	"errors"
+	"github.com/M0hammadUsman/letschat/internal/domain"
+)
 
 type LocalConversationRepository struct {
 	db *DB
@@ -12,8 +16,8 @@ func NewLocalConversationRepository(db *DB) LocalConversationRepository {
 
 func (r LocalConversationRepository) SaveConversations(convos ...*domain.Conversation) error {
 	query := `
-		INSERT INTO conversation(user_id, username, user_email, latest_msg) 
-		VALUES (:user_id, :username, :user_email, :latest_msg, :last_online)
+		INSERT INTO conversation(user_id, username, user_email) 
+		VALUES (:user_id, :username, :user_email)
 	`
 	for _, convo := range convos {
 		_, err := r.db.NamedExec(query, convo)
@@ -23,9 +27,34 @@ func (r LocalConversationRepository) SaveConversations(convos ...*domain.Convers
 	}
 	return nil
 }
+
+func (r LocalConversationRepository) DeleteAllConversations() error {
+	query := `
+		DELETE FROM conversation
+	`
+	_, err := r.db.Exec(query)
+	return err
+}
+
+func (r LocalConversationRepository) GetConversationByUserID(id string) (*domain.Conversation, error) {
+	query := `
+		SELECT user_id, username, user_email 
+		FROM conversation
+		WHERE user_id = :user_id  
+	`
+	var c domain.Conversation
+	if err := r.db.QueryRowx(query, id).StructScan(&c); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, domain.ErrRecordNotFound
+		}
+		return nil, err
+	}
+	return &c, nil
+}
+
 func (r LocalConversationRepository) GetConversations() ([]*domain.Conversation, error) {
 	query := `
-		SELECT * FROM conversation
+		SELECT user_id, username, user_email FROM conversation
 	`
 	rows, _ := r.db.Queryx(query)
 	convos := make([]*domain.Conversation, 0)

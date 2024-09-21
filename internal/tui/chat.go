@@ -6,6 +6,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	zone "github.com/lrstanley/bubblezone"
+	"strings"
 )
 
 const (
@@ -15,30 +16,36 @@ const (
 )
 
 type ChatModel struct {
-	chatTxtarea      textarea.Model
-	chatViewport     ChatViewport
-	focusIdx         int // 0 -> chatTxtarea, 1 -> chatViewport
-	focus            bool
-	client           *client.Client
-	selConvoUsername string
+	chatTxtarea  textarea.Model
+	chatViewport ChatViewportModel
+	focusIdx     int // 0 -> chatTxtarea, 1 -> chatViewport
+	focus        bool
+	client       *client.Client
 }
 
-func InitialChatModel() ChatModel {
+func InitialChatModel(c *client.Client) ChatModel {
 	return ChatModel{
 		chatTxtarea:  newChatTxtArea(),
-		chatViewport: InitialChatViewport(),
+		chatViewport: InitialChatViewport(c),
+		client:       c,
 	}
 }
 
 func (m ChatModel) Init() tea.Cmd {
-	return textarea.Blink
+	return tea.Batch(textarea.Blink, m.chatViewport.Init())
 }
 
 func (m ChatModel) Update(msg tea.Msg) (ChatModel, tea.Cmd) {
 	if !m.focus {
+		m.chatViewport.focus = false
 		m.chatTxtarea.Blur()
 		m.updateChatTxtareaAndViewportDimensions()
+	} else if m.chatTxtarea.Focused() {
+		m.chatViewport.focus = false
+	} else {
+		m.chatViewport.focus = true
 	}
+
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.updateChatTxtareaAndViewportDimensions()
@@ -49,34 +56,32 @@ func (m ChatModel) Update(msg tea.Msg) (ChatModel, tea.Cmd) {
 			m.updateChatTxtareaAndViewportDimensions()
 			return m, cmd
 		case "ctrl+s":
+			s := m.chatTxtarea.Value()
+			s = strings.TrimSpace(s)
 			m.chatTxtarea.Reset()
-			m.chatTxtarea.Blur()
-			m.chatTxtarea.SetHeight(2) // we initialize with 0
+			return m, tea.Batch(m.sendMessage(s), m.handleChatTextareaUpdate(msg), m.handleChatViewportUpdate(msg))
 		case "esc":
 			m.chatTxtarea.Blur()
+			m.updateChatTxtareaAndViewportDimensions()
 			return m, nil
 		}
 		//m.updateChatTxtareaAndViewportDimensions()
 	case tea.MouseMsg:
 		switch msg.Button {
-		case tea.MouseButtonLeft:
-			if zone.Get("helllo").InBounds(msg) {
-				return m, tea.Quit
-			}
 		case tea.MouseButtonWheelDown:
-			if zone.Get(chatTxtarea).InBounds(msg) {
+			if zone.Get(chatTxtarea).InBounds(msg) && m.focus {
 				m.chatTxtarea.CursorDown()
 			}
 		case tea.MouseButtonWheelUp:
-			if zone.Get(chatTxtarea).InBounds(msg) {
+			if zone.Get(chatTxtarea).InBounds(msg) && m.focus {
 				m.chatTxtarea.CursorUp()
 			}
 		case tea.MouseButtonWheelRight:
-			if zone.Get(chatTxtarea).InBounds(msg) {
+			if zone.Get(chatTxtarea).InBounds(msg) && m.focus {
 				m.chatTxtarea.SetCursor(m.chatTxtarea.LineInfo().CharOffset + 1)
 			}
 		case tea.MouseButtonWheelLeft:
-			if zone.Get(chatTxtarea).InBounds(msg) {
+			if zone.Get(chatTxtarea).InBounds(msg) && m.focus {
 				m.chatTxtarea.SetCursor(max(0, m.chatTxtarea.LineInfo().CharOffset-1))
 			}
 		default:
@@ -95,7 +100,7 @@ func (m ChatModel) Update(msg tea.Msg) (ChatModel, tea.Cmd) {
 }
 
 func (m ChatModel) View() string {
-	if m.selConvoUsername == "" {
+	if selUsername == "" {
 		return chatContainerStyle.
 			Width(chatWidth()).
 			Height(chatHeight()).
@@ -103,7 +108,7 @@ func (m ChatModel) View() string {
 			AlignVertical(lipgloss.Center).
 			Render(rabbit)
 	}
-	h := renderChatHeader(m.selConvoUsername)
+	h := renderChatHeader(selUsername)
 	chatHeaderHeight = lipgloss.Height(h)
 	ta := zone.Mark(chatTxtarea, m.chatTxtarea.View())
 	ta = renderChatTextarea(ta, m.chatTxtarea.Focused())
@@ -173,4 +178,16 @@ func (m *ChatModel) updateChatTxtareaAndViewportDimensions() {
 		m.chatTxtarea.SetHeight(0)
 	}
 	m.chatViewport.updateDimensions()
+}
+
+func (m *ChatModel) sendMessage(msg string) tea.Cmd {
+	return func() tea.Msg {
+		if err := m.client.SendMessage(msg, selUserID); err != nil {
+			return &errMsg{
+				err:  "Unable to send message",
+				code: 0,
+			}
+		}
+		return nil
+	}
 }

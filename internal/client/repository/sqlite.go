@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"fmt"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3"
 	"os"
@@ -27,7 +28,7 @@ const ( // Local Database tables for client side application
             receiver_id TEXT,
             body TEXT NOT NULL,
             sent_at TEXT,
-            delivered_at DATETIME DEFAULT (DATETIME('now')),
+            delivered_at DATETIME,
             read_at DATETIME,
             version INTEGER NOT NULL DEFAULT 1
 		);
@@ -37,8 +38,7 @@ const ( // Local Database tables for client side application
 		CREATE TABLE IF NOT EXISTS conversation (
             user_id TEXT NOT NULL,
             username TEXT NOT NULL,
-            user_email TEXT NOT NULL,
-            latest_msg TEXT
+            user_email TEXT NOT NULL
 		);
 	`
 )
@@ -47,10 +47,26 @@ type DB struct {
 	*sqlx.DB
 }
 
-func OpenDB(filesDir string) (*DB, error) {
+/*func OpenDB(filesDir string) (*DB, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	db, err := sqlx.ConnectContext(ctx, "sqlite3", filepath.Join(filesDir, "Letschat.db"))
+	if err == nil {
+		db.SetMaxOpenConns(5)
+		db.SetMaxIdleConns(5)
+		db.SetConnMaxIdleTime(15 * time.Minute)
+	}
+	if err != nil && db != nil {
+		db.Close()
+	}
+	return &DB{db}, err
+}*/
+
+func OpenDB(filesDir string, key int) (*DB, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	name := fmt.Sprintf("Letschat%v.db", key)
+	db, err := sqlx.ConnectContext(ctx, "sqlite3", filepath.Join(filesDir, name))
 	if err == nil {
 		db.SetMaxOpenConns(5)
 		db.SetMaxIdleConns(5)

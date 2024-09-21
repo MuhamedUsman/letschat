@@ -60,3 +60,7 @@ func (bt *BackgroundTask) Shutdown(timeout time.Duration) error {
 		return fmt.Errorf("shutdown timeout, some background tasks may not have finished")
 	}
 }
+
+func (bt *BackgroundTask) GetShtdwnCtx() context.Context {
+	return bt.ctx
+}

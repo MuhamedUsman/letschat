@@ -65,6 +65,11 @@ type MessageSent struct {
 	Operation   MessageOperation `json:"operation"`
 }
 
+type LatestMsgBody struct {
+	Body   *string    `db:"body"`
+	SentAt *time.Time `db:"sent_at"`
+}
+
 func (m MessageSent) ValidateMessageSent() *ErrValidation {
 	ev := NewErrValidation()
 	ValidateMessageRcvrID(m.ReceiverID, ev)

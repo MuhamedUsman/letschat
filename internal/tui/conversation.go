@@ -10,6 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	zone "github.com/lrstanley/bubblezone"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -22,12 +23,14 @@ const (
 
 type ConversationModel struct {
 	conversationList list.Model
+	// if there is a redirect from the discover tab then we add the selected user here,
+	// so if there is dynamic changes to the conversation list, we first check if the selDiscUser is not nil
+	// then we add that user in the top of the list
+	selDiscUserConvo *domain.Conversation
 	// there is no built-in functionality for list focus as far as I scanned the docs, also see
 	// getConversationListKeyMap, this will still update the model but make it look out of focus
-	focus            bool
-	client           *client.Client
-	selConvoUsername string
-	selConvoUsrID    string
+	focus  bool
+	client *client.Client
 }
 
 type conversationItem struct{ id, selConvoUsrId, title, latestMsg string }
@@ -75,6 +78,13 @@ func (m ConversationModel) Update(msg tea.Msg) (ConversationModel, tea.Cmd) {
 		m.conversationList.SetShowStatusBar(false)
 	}
 
+	// Remove the selDiscUserConvo as the user changed the convo selection
+	// if there is a message sent on this convo the dynamic fetch "getConversations()" will show this convo
+	if m.selDiscUserConvo != nil && m.selDiscUserConvo.UserID != selUserID {
+		m.selDiscUserConvo = nil
+		m.conversationList.RemoveItem(0)
+	}
+
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.updateConversationWindowSize()
@@ -83,13 +93,19 @@ func (m ConversationModel) Update(msg tea.Msg) (ConversationModel, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "enter":
-			m.selConvoUsername = m.getSelConvoUsername()
-			m.selConvoUsrID = m.getSelConvoUsrID()
+			if m.focus {
+				selUserID = m.getSelConvoUsrID()
+				selUsername = m.getSelConvoUsername()
+			}
 			return m, nil
 		case "ctrl+f":
 			return m, tea.Batch(m.conversationList.FilterInput.Focus(), m.handleConversationListUpdate(msg))
 		case "ctrl+t":
 			m.conversationList.FilterInput.Blur()
+		case "ctrl+s": // create the convo if the selDiscUserConvo does not exist
+			if m.selDiscUserConvo != nil {
+				return m, m.createConvoIfNotExist()
+			}
 		case "esc":
 			m.conversationList.FilterInput.Blur()
 		}
@@ -116,8 +132,8 @@ func (m ConversationModel) Update(msg tea.Msg) (ConversationModel, tea.Cmd) {
 				if zone.Get(v.id).InBounds(msg) {
 					// If so, select it in the list.
 					m.conversationList.Select(i)
-					m.selConvoUsername = m.getSelConvoUsername()
-					m.selConvoUsrID = m.getSelConvoUsrID()
+					selUserID = m.getSelConvoUsrID()
+					selUsername = m.getSelConvoUsername()
 					break
 				}
 			}
@@ -132,8 +148,26 @@ func (m ConversationModel) Update(msg tea.Msg) (ConversationModel, tea.Cmd) {
 
 	case []list.Item:
 		// m.getConversations() so we can read again for updated conversations
-		return m, tea.Batch(m.conversationList.SetItems(msg), spinnerResetCmd, m.getConversations())
+		return m, tea.Batch(
+			m.conversationList.SetItems(msg),
+			spinnerResetCmd,
+			m.getConversations(),
+			m.conversationList.NewStatusMessage("Updated Conversations"),
+		)
+
+	case selDiscUserMsg:
+		convo := &domain.Conversation{
+			UserID:    msg.id,
+			Username:  msg.name,
+			UserEmail: msg.email,
+		}
+		m.selDiscUserConvo = convo
+		selUserID = msg.id
+		selUsername = msg.name
+		cmd := m.conversationList.InsertItem(0, populateConvoItem(-1, convo))
+		return m, cmd
 	}
+
 	return m, tea.Batch(m.handleConversationListUpdate(msg))
 }
 
@@ -220,6 +254,12 @@ func populateConvoItem(i int, convo *domain.Conversation) conversationItem {
 	return item
 }
 
+func containsSelConvo(convos []*domain.Conversation, convoUsrID string) bool {
+	return slices.ContainsFunc(convos, func(conversation *domain.Conversation) bool {
+		return convoUsrID == conversation.UserID
+	})
+}
+
 func (m *ConversationModel) handleConversationSearchTxtInput(msg tea.Msg) tea.Cmd {
 	var cmd tea.Cmd
 	m.conversationList.FilterInput, cmd = m.conversationList.FilterInput.Update(msg)
@@ -240,10 +280,25 @@ func (m *ConversationModel) updateConversationWindowSize() {
 
 func (m ConversationModel) getConversations() tea.Cmd {
 	return func() tea.Msg {
+		ctx := m.client.BT.GetShtdwnCtx()
 		c := make([]list.Item, 0)
-		for i, convo := range m.client.Conversations.WaitForStateChange() {
+		convos := m.client.Conversations.WaitForStateChange()
+		// we check if the ctx is done after unblocking
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+		}
+		for i, convo := range convos {
+			if i == 0 { // add it to first idx
+				// selDisUserConvo is there, and it's not in the fetched list
+				// so we do not duplicate and affect the sel discovered user on dynamic fetch after wait
+				if m.selDiscUserConvo != nil && !containsSelConvo(convos, m.selDiscUserConvo.UserID) {
+					c = append(c, populateConvoItem(-1, m.selDiscUserConvo))
+				}
+			}
 			item := populateConvoItem(i, convo)
-			c = append(c, list.Item(item))
+			c = append(c, item)
 		}
 		return c
 	}
@@ -251,12 +306,27 @@ func (m ConversationModel) getConversations() tea.Cmd {
 
 func (m ConversationModel) getSelConvoUsrID() string {
 	// We hold the actual "title|selectedConvoUsrID" in the filter value
+	if m.conversationList.SelectedItem() == nil {
+		return ""
+	}
 	fv := m.conversationList.SelectedItem().FilterValue()
 	idWithSomeStylingTxt := strings.Split(fv, "|")[1] // 033d13fa-b6d8-43db-b288-34fe801570e6[1012z
 	return idWithSomeStylingTxt[:36]
 }
 
 func (m ConversationModel) getSelConvoUsername() string {
+	if m.conversationList.SelectedItem() == nil {
+		return ""
+	}
 	fv := m.conversationList.SelectedItem().FilterValue()
 	return strings.Split(fv, "|")[0]
+}
+
+func (m ConversationModel) createConvoIfNotExist() tea.Cmd {
+	if err := m.client.CreateConvoIfNotExist(m.selDiscUserConvo); err != nil {
+		return func() tea.Msg {
+			return &errMsg{err: "Unable to create the conversation", code: 0}
+		}
+	}
+	return nil
 }

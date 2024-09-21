@@ -42,11 +42,13 @@ func (s *StateMonitor[T]) WaitForStateChange() T {
 	return s.s
 }
 
-// WriteToChan writes the passed value to the chan, Broadcast must be called afterward
+// WriteToChan writes the passed value to the chan
 func (s *StateMonitor[T]) WriteToChan(v T) {
 	s.c <- v
 }
 
+// Broadcast reads on the chan once there is a read it updates the conditioned variable and broadcasts
+// Broadcast must be called on startup in a separate goroutine
 func (s *StateMonitor[T]) Broadcast(shtdwnCtx context.Context) {
 	for {
 		select {

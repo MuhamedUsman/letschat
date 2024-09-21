@@ -3,9 +3,10 @@ package client
 import (
 	"context"
 	"errors"
-	"github.com/M0hammadUsman/letschat/internal/client/sync"
 	"github.com/M0hammadUsman/letschat/internal/domain"
+	"github.com/M0hammadUsman/letschat/internal/sync"
 	"github.com/google/uuid"
+	"log/slog"
 	"time"
 )
 
@@ -25,32 +26,46 @@ func newRecvMsgsStateMonitor() *RecvMsgsMonitor {
 	return sync.NewStatus[*domain.Message](nil)
 }
 
-func (c *Client) SendMessage(msg string, recvrID string) (*domain.Message, error) {
+func (c *Client) SendMessage(msg string, recvrID string) error {
 	// first save in db
 	m := new(domain.Message)
 	m.ID = uuid.New().String()
 	m.SenderID = c.CurrentUsr.ID
 	m.ReceiverID = recvrID
 	m.Body = msg
-	m.SentAt = ptr(time.Now())
+	m.SentAt = ptr(time.Now().UTC())
 	m.Operation = domain.CreateMsg
 	c.sentMsgs.msgs <- m // this will send the msg
 	// if it's not sent save it to db without the sentAt field
 	if !<-c.sentMsgs.done {
 		m.SentAt = nil
 		if err := c.repo.SaveMsg(m); err != nil {
-			return nil, err
+			return err
 		}
 		// before returning write the conversations with updated last msgs to chan, tui.ConversationModel will pick it
-		c.writeUpdatedConvosToChan()
-		return m, ErrMsgNotSent
+		convos, _ := c.repo.GetConversations()
+		c.populateConvosAndWriteToChan(convos)
+		return ErrMsgNotSent
 	}
 	// if sent save with sentAt field
 	if err := c.repo.SaveMsg(m); err != nil {
-		return nil, err
+		return err
 	}
-	c.writeUpdatedConvosToChan()
-	return m, nil
+	convos, _ := c.repo.GetConversations()
+	c.populateConvosAndWriteToChan(convos)
+	return nil
+}
+
+func (c *Client) GetMessagesAsPage(senderID string, page int) ([]*domain.Message, *domain.Metadata, error) {
+	f := domain.Filter{
+		Page:     page,
+		PageSize: 25,
+	}
+	msgs, metadata, err := c.repo.GetMsgsAsPage(senderID, f)
+	if err != nil {
+		return nil, nil, err
+	}
+	return msgs, metadata, nil
 }
 
 func (c *Client) handleReceivedMsgs(shtdwnCtx context.Context) {
@@ -65,7 +80,11 @@ func (c *Client) handleReceivedMsgs(shtdwnCtx context.Context) {
 
 		case domain.CreateMsg:
 			msg.DeliveredAt = ptr(time.Now())
-			_ = c.repo.SaveMsg(msg)
+			err := c.repo.SaveMsg(msg)
+			if err != nil {
+				slog.Error(err.Error())
+			}
+			// TODO: send back message as delivered
 
 		case domain.UpdateMsg:
 			msgToUpdate, err := c.repo.GetMsgByID(msg.ID)
@@ -93,6 +112,10 @@ func (c *Client) handleReceivedMsgs(shtdwnCtx context.Context) {
 		case domain.UserOfflineMsg:
 			c.setUsrOnlineStatus(shtdwnCtx, msg, false)
 		}
+		// once there is a message we also update the conversations as the latest msg will also need update
+		convos := c.Conversations.GetAndBlock()
+		c.Conversations.Unblock()
+		c.populateConvosAndWriteToChan(convos)
 	}
 }
 

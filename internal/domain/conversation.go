@@ -15,7 +15,8 @@ type Conversation struct {
 	// status of user other than the currently logged-in user, can be either sender or receiver
 	LastOnline *time.Time `json:"lastOnline" db:"last_online"`
 	// latest msg to display under user's name in TUI, only used on frontend side
-	LatestMsg *string `json:"-"               db:"latest_msg"`
+	LatestMsg       *string    `json:"-"`
+	LatestMsgSentAt *time.Time `json:"-"`
 }
 
 type ConversationService interface {

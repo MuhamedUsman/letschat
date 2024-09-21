@@ -40,11 +40,7 @@ func (s *Server) WebsocketSubscribeHandler(w http.ResponseWriter, r *http.Reques
 		s.serverErrorResponse(w, r, err)
 		return
 	}
-	if err = s.Facade.WriteUnDeliveredMessagesToWSConn(r.Context(), u.Messages); err != nil {
-		slog.Error(err.Error())
-		return
-	}
-	defer s.WebsocketSubscribeHandlerDeferFunc(r.Context(), conn)
+
 	// buffered because if there is any error we'll return so we don't want the other writes to block
 	errChan := make(chan error, 1) // if there is a single err we log and return
 	reqCtx, cancel := context.WithCancel(r.Context())
@@ -55,6 +51,14 @@ func (s *Server) WebsocketSubscribeHandler(w http.ResponseWriter, r *http.Reques
 	s.BackgroundTask.Run(func(shtdwnCtx context.Context) {
 		errChan <- s.handleSentMessages(shtdwnCtx, reqCtx, conn)
 	})
+
+	// this writes to the chan that is read by handleReceivedMessages func so it must be called afterward
+
+	if err = s.Facade.WriteUnDeliveredMessagesToWSConn(r.Context(), u.Messages); err != nil {
+		slog.Error(err.Error())
+		return
+	}
+	defer s.WebsocketSubscribeHandlerDeferFunc(r.Context(), conn)
 
 	if err = <-errChan; err != nil {
 		// Once there is an error from one of the background tasks,

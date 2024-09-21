@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/M0hammadUsman/letschat/internal/client/repository"
-	"github.com/M0hammadUsman/letschat/internal/client/sync"
 	"github.com/M0hammadUsman/letschat/internal/domain"
+	"github.com/M0hammadUsman/letschat/internal/sync"
 	"io"
 	"log"
 	"log/slog"
@@ -212,7 +212,7 @@ func (c *Client) manageUserLogins(shtdwnCtx context.Context) {
 			// in this case we'll still be creating a new DB file
 			_ = repository.DeleteDBFile(c.FilesDir)
 			// Opening a new conn to sqlite db will create a new file
-			db, err := repository.OpenDB(c.FilesDir)
+			db, err := repository.OpenDB(c.FilesDir, c.krm.key)
 			// very unlikely but if happens, there is no reason to continue normal application execution
 			if err != nil {
 				log.Fatal(err)

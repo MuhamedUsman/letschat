@@ -3,8 +3,8 @@ package client
 import (
 	"context"
 	"errors"
-	"github.com/M0hammadUsman/letschat/internal/client/sync"
 	"github.com/M0hammadUsman/letschat/internal/domain"
+	"github.com/M0hammadUsman/letschat/internal/sync"
 	"github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
 	"log/slog"
@@ -82,7 +82,6 @@ func (c *Client) handleReceiveMessages(conn *websocket.Conn, shtdwnCtx context.C
 			return err
 		}
 		c.RecvMsgs.WriteToChan(&msg)
-		c.RecvMsgs.Broadcast(shtdwnCtx)
 	}
 }
 

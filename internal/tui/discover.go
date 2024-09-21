@@ -9,6 +9,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	zone "github.com/lrstanley/bubblezone"
+	"log/slog"
 	"strconv"
 	"unicode/utf8"
 )
@@ -21,6 +22,7 @@ const (
 type DiscoverModel struct {
 	searchTxtInput textinput.Model
 	table          table.Model
+	tableUsrIDs    []string // user ids related to each row
 	metadata       domain.Metadata
 	totalPages     int
 	focusIdx       int // 0 -> Search, 1 -> Table
@@ -73,6 +75,20 @@ func (m DiscoverModel) Update(msg tea.Msg) (DiscoverModel, tea.Cmd) {
 					return m, tea.Batch(spinnerSpinCmd, m.searchUser(m.searchTxtInput.Value(), 1))
 				}
 			}
+			if m.focusIdx == 1 && m.focus {
+				selRow := m.table.SelectedRow()
+				idx, err := strconv.Atoi(selRow[0]) // visual index (#)
+				if err != nil {
+					slog.Error(err.Error())
+				} else {
+					selMsg := selDiscUserMsg{
+						id:    m.tableUsrIDs[idx-1],
+						name:  selRow[1],
+						email: selRow[2],
+					}
+					return m, func() tea.Msg { return selMsg } // cmd
+				}
+			}
 		}
 
 	case tea.MouseMsg:
@@ -103,6 +119,7 @@ func (m DiscoverModel) Update(msg tea.Msg) (DiscoverModel, tea.Cmd) {
 
 	case tableResp:
 		m.table.SetRows(msg.rows)
+		m.tableUsrIDs = msg.rowsIds
 		m.metadata = msg.metadata
 		if m.metadata.CurrentPage == 1 {
 			m.table.SetCursor(0)
@@ -214,6 +231,7 @@ func (m *DiscoverModel) focusAccordingly() tea.Cmd {
 
 type tableResp struct {
 	rows     []table.Row
+	rowsIds  []string
 	metadata domain.Metadata
 }
 
@@ -227,15 +245,18 @@ func (m DiscoverModel) searchUser(query string, page int) tea.Cmd {
 			return &errMsg{err: err.Error(), code: code}
 		}
 		rows := m.table.Rows()
+		ids := m.tableUsrIDs
 		l := len(rows)
 		for _, u := range resp.Users {
 			cell := table.Row{strconv.Itoa(l + 1), u.Name, u.Email, u.CreatedAt.Format("January 2006")}
 			l++
 			rows = append(rows, cell)
+			ids = append(ids, u.ID)
 		}
 		m.table.SetRows(rows)
 		return tableResp{
 			rows:     rows,
+			rowsIds:  ids,
 			metadata: resp.Metadata,
 		}
 	}

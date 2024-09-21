@@ -132,6 +132,9 @@ func (m TabContainerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case resetSpinnerMsg:
 		m.resetSpinner()
+
+	case selDiscUserMsg:
+		m.activeTab = 1
 	}
 
 	return m, tea.Batch(m.handleChildModelUpdates(msg), m.handleStopwatchUpdate(msg))
@@ -212,7 +215,11 @@ func renderContainerWithTabs(tabs string, content string) string {
 }
 
 func renderErrContainer(err string, code int, timer string) string {
-	h := errHeaderStyle.Render(strconv.Itoa(code), "-", http.StatusText(code))
+	statusTxt := http.StatusText(code)
+	if code == 0 { // Application Error
+		statusTxt = "Application Error"
+	}
+	h := errHeaderStyle.Render(strconv.Itoa(code), "-", statusTxt)
 	margin := errContainerStyle.GetWidth() - (lipgloss.Width(h) + 6)
 	t := lipgloss.NewStyle().Foreground(dangerColor).MarginLeft(margin).Render(timer)
 	h = lipgloss.JoinHorizontal(lipgloss.Left, h, t)
