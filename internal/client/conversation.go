@@ -13,62 +13,64 @@ import (
 	"slices"
 )
 
-type Conversations []*domain.Conversation
-type ConversationsMonitor = sync.StateMonitor[Conversations]
+type Convos []*domain.Conversation
 
-func newConversationsMonitor() *ConversationsMonitor {
-	return sync.NewStatus[Conversations](nil)
+type ConvosBroadcaster = sync.Broadcaster[Convos]
+
+func newConvosBroadcaster() *ConvosBroadcaster {
+	return sync.NewBroadcaster[Convos]()
 }
 
 // populateConversationsAccordingToWsConnState gets the conversations once there is a read from WsConnStateChan
 // and populates the conversations in Client, once the connection state is Connected it fetches from the server,
 // in case of Disconnected it retrieves from the local db
 func (c *Client) populateConversationsAccordingToWsConnState(shtdwnCtx context.Context) {
+	token, ch := c.WsConnState.Subscribe()
+	defer c.WsConnState.Unsubscribe(token)
 	for {
-		s := c.WsConnState.WaitForStateChange()
 		select {
-		case <-shtdwnCtx.Done():
-			return
-		default:
-		}
-		switch s {
-		case Connected:
-			convos, err, code := c.getConversations()
-			if err != nil { // fetch from db
-				convos, err = c.repo.GetConversations()
+		case s := <-ch:
+			switch s {
+			case Connected:
+				convos, code, err := c.getConversations()
+				if err != nil { // fetch from db
+					convos, err = c.repo.GetConversations()
+					if err != nil {
+						log.Fatal(err)
+					}
+				}
+				if code == http.StatusUnauthorized {
+					c.LoginState.Write(false) // user will be redirected to log-in by tui
+				} else {
+					c.populateConvosAndWriteToChan(convos)
+					_ = c.repo.DeleteAllConversations()
+					_ = c.repo.SaveConversations(convos...) // ignore the error
+				}
+			case Disconnected:
+				convos, err := c.repo.GetConversations()
 				if err != nil {
 					log.Fatal(err)
 				}
-			}
-			if code == http.StatusUnauthorized {
-				c.LoginState.WriteToChan(false) // user will be redirected to log-in by tui
-			} else {
 				c.populateConvosAndWriteToChan(convos)
-				_ = c.repo.DeleteAllConversations()
-				_ = c.repo.SaveConversations(convos...) // ignore the error
+			default:
 			}
-		case Disconnected:
-			convos, err := c.repo.GetConversations()
-			if err != nil {
-				log.Fatal(err)
-			}
-			c.populateConvosAndWriteToChan(convos)
-		default:
+		case <-shtdwnCtx.Done():
+			return
 		}
 	}
 }
 
-func (c *Client) getConversations() ([]*domain.Conversation, error, int) {
+func (c *Client) getConversations() ([]*domain.Conversation, int, error) {
 	r, err := http.NewRequest(http.MethodGet, getConversations, nil)
 	if err != nil {
 		slog.Error(err.Error())
-		return nil, ErrApplication, 0
+		return nil, 0, ErrApplication
 	}
 	r.Header.Set("Authorization", "Bearer "+c.AuthToken)
 	resp, err := http.DefaultClient.Do(r)
 	if err != nil {
 		slog.Error(err.Error())
-		return nil, getMostNestedError(err), http.StatusServiceUnavailable
+		return nil, http.StatusServiceUnavailable, getMostNestedError(err)
 	}
 	defer resp.Body.Close()
 	readBody, _ := io.ReadAll(resp.Body)
@@ -77,9 +79,9 @@ func (c *Client) getConversations() ([]*domain.Conversation, error, int) {
 	}
 	if err = json.Unmarshal(readBody, &res); err != nil {
 		slog.Error(err.Error())
-		return nil, ErrApplication, 0
+		return nil, 0, ErrApplication
 	}
-	return res.Conversations, nil, resp.StatusCode
+	return res.Conversations, resp.StatusCode, nil
 }
 
 func (c *Client) populateConvosAndWriteToChan(convos []*domain.Conversation) {
@@ -107,7 +109,7 @@ func (c *Client) populateConvosAndWriteToChan(convos []*domain.Conversation) {
 		}
 		return b.LatestMsgSentAt.Compare(*a.LatestMsgSentAt)
 	})
-	c.Conversations.WriteToChan(convos)
+	c.Conversations.Write(convos)
 }
 
 func (c *Client) CreateConvoIfNotExist(convo *domain.Conversation) error {

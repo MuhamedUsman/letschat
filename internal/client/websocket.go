@@ -24,10 +24,10 @@ const (
 	Connected
 )
 
-type WsConnMonitor = sync.StateMonitor[WsConnState]
+type WsConnBroadcaster = sync.Broadcaster[WsConnState]
 
-func newWsConnMonitor() *WsConnMonitor {
-	return sync.NewStatus[WsConnState](Disconnected)
+func newWsConnBroadcaster() *WsConnBroadcaster {
+	return sync.NewBroadcaster[WsConnState]()
 }
 
 // WsConnectAndListenForMessages connects to ws and listen for recvMsgs,
@@ -43,23 +43,23 @@ func (c *Client) wsConnectAndListenForMessages(shtdwnCtx context.Context) {
 	conn, r, err := websocket.Dial(context.Background(), subscribeTo, opts)
 	if err != nil {
 		if r != nil && r.StatusCode == http.StatusUnauthorized {
-			c.LoginState.WriteToChan(false)
+			c.LoginState.Write(false)
 		}
-		c.WsConnState.WriteToChan(Disconnected)
+		c.WsConnState.Write(Disconnected)
 		return
 	}
 	defer conn.CloseNow()
 	if r.StatusCode != http.StatusSwitchingProtocols {
-		c.WsConnState.WriteToChan(Disconnected)
+		c.WsConnState.Write(Disconnected)
 		return
 	}
-	c.WsConnState.WriteToChan(Connected)
+	c.WsConnState.Write(Connected)
 	errChan := make(chan error)
 	go func() { errChan <- c.handleSentMessages(conn, shtdwnCtx) }()
 	go func() { errChan <- c.handleReceiveMessages(conn, shtdwnCtx) }()
 	if err = <-errChan; err != nil {
 		if shtdwnCtx.Err() == nil { // In case the shtdwnCtx is canceled we do not signal a Disconnect
-			c.WsConnState.WriteToChan(Disconnected)
+			c.WsConnState.Write(Disconnected)
 		}
 		if websocket.CloseStatus(err) == websocket.StatusNormalClosure ||
 			websocket.CloseStatus(err) == websocket.StatusGoingAway ||
@@ -81,7 +81,7 @@ func (c *Client) handleReceiveMessages(conn *websocket.Conn, shtdwnCtx context.C
 		if err := wsjson.Read(shtdwnCtx, conn, &msg); err != nil {
 			return err
 		}
-		c.RecvMsgs.WriteToChan(&msg)
+		c.RecvMsgs.Write(&msg)
 	}
 }
 
@@ -110,42 +110,42 @@ func (c *Client) handleSentMessages(conn *websocket.Conn, shtdwnCtx context.Cont
 // we'll only get disconnect error once we try to write to this conn,
 // and also we use this chan to read and communicate to the user in TUI what is happening in the background
 func (c *Client) attemptWsReconnectOnDisconnect(shtdwnCtx context.Context) {
+	token, ch := c.WsConnState.Subscribe()
+	defer c.WsConnState.Unsubscribe(token)
 	attempt := 1
 	maxAttempts := 5
 	maxDelay := 30 * time.Second
 	for {
-		s := c.WsConnState.WaitForStateChange()
 		select {
+		case s := <-ch:
+			// we switch on the s, so we can attempt a reconnect while skipping the backoff time if need be
+			switch s {
+			case Disconnected:
+				c.WsConnState.Write(WaitingForReconnection)
+			case WaitingForReconnection:
+				// After 5th retry
+				if attempt == maxAttempts {
+					c.WsConnState.Write(Disconnected)
+					return
+				}
+				// reconnecting after backoff time
+				expbackoff := exponentialBackoff(attempt, maxDelay)
+				t := time.NewTimer(expbackoff)
+				select {
+				case <-t.C:
+					c.WsConnState.Write(Reconnecting)
+				case <-shtdwnCtx.Done():
+					// stop on timer is not necessary after go 1.23
+					return
+				}
+			case Reconnecting:
+				go c.wsConnectAndListenForMessages(shtdwnCtx)
+				attempt++
+			case Connected:
+				attempt = 0
+			}
 		case <-shtdwnCtx.Done():
 			return
-		default:
-		}
-		// we switch on the s so we can attempt a reconnect while skipping the backoff time if need be
-		switch s {
-		case Disconnected:
-			c.WsConnState.WriteToChan(WaitingForReconnection)
-		case WaitingForReconnection:
-			// After 5th retry
-			if attempt == maxAttempts {
-				c.WsConnState.WriteToChan(Disconnected)
-				return
-			}
-			// reconnecting after backoff time
-			expbackoff := exponentialBackoff(attempt, maxDelay)
-			t := time.NewTimer(expbackoff)
-			select {
-			case <-t.C:
-				attempt++
-				c.WsConnState.WriteToChan(Reconnecting)
-			case <-shtdwnCtx.Done():
-				// stop on timer is not necessary after go 1.23
-				return
-			}
-		case Reconnecting:
-			go c.wsConnectAndListenForMessages(shtdwnCtx)
-			attempt++
-		case Connected:
-			attempt = 0
 		}
 	}
 }

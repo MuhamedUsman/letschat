@@ -19,7 +19,6 @@ var (
 type LetschatModel struct {
 	conversation ConversationModel
 	chat         ChatModel
-	active       int // 0 conversation, 1 chat
 	focus        bool
 	client       *client.Client
 }
@@ -44,6 +43,13 @@ func (m LetschatModel) Update(msg tea.Msg) (LetschatModel, tea.Cmd) {
 			m.chat.focus = false
 
 		} else if zone.Get(letschatChat).InBounds(msg) {
+			m.chat.focus = true
+			m.conversation.focus = false
+		}
+
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "ctrl+t":
 			m.chat.focus = true
 			m.conversation.focus = false
 		}

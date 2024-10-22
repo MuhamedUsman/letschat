@@ -44,3 +44,18 @@ build/debug:
 	CGOENABLED=1; \
 	go build -gcflags "all=-N -l" -o ./bin ./cmd/letschat; \
 	dlv --listen=:2345 --headless=true --api-version=2 --accept-multiclient exec ./bin/letschat.exe
+
+# ==================================================================================== #
+# QUALITY CONTROL
+# ==================================================================================== #
+
+## audit: tidy dependencies and format, vet and test all code
+.PHONY: audit
+audit:
+	@echo 'Formating code...'
+	go fmt ./...
+	@echo 'Vetting code...'
+	go vet ./...
+	staticcheck ./...
+	@echo 'Running tests...'
+	CGO_ENABLED=1 go test -race -vet=off ./...

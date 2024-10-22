@@ -41,7 +41,17 @@ func (s *MessageService) ProcessSentMessages(ctx context.Context, m *domain.Mess
 	case domain.CreateMsg:
 		return s.messageRepo.InsertMessage(ctx, m)
 	case domain.UpdateMsg:
-		return s.messageRepo.UpdateMessage(ctx, m)
+		msg, err := s.messageRepo.GetByID(ctx, m.ID)
+		if err != nil {
+			return err
+		}
+		if m.DeliveredAt != nil {
+			msg.DeliveredAt = m.DeliveredAt
+		}
+		if m.ReadAt != nil {
+			msg.ReadAt = m.ReadAt
+		}
+		return s.messageRepo.UpdateMessage(ctx, msg)
 	case domain.DeleteMsg:
 		return s.messageRepo.DeleteMessage(ctx, m.ID)
 	case domain.UserOnlineMsg:

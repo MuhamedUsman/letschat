@@ -23,13 +23,14 @@ const ( // Local Database tables for client side application
 	`
 	createMessageTable = `
 		CREATE TABLE IF NOT EXISTS message (
-            id TEXT PRIMARY KEY, -- Simulating UUID
+            id TEXT PRIMARY KEY,
             sender_id TEXT,
             receiver_id TEXT,
             body TEXT NOT NULL,
             sent_at TEXT,
             delivered_at DATETIME,
             read_at DATETIME,
+            confirmation INTEGER DEFAULT 0,
             version INTEGER NOT NULL DEFAULT 1
 		);
 		CREATE INDEX IF NOT EXISTS idx_message_sender_receiver_sent_at ON message(sender_id, receiver_id, sent_at DESC);
@@ -46,21 +47,6 @@ const ( // Local Database tables for client side application
 type DB struct {
 	*sqlx.DB
 }
-
-/*func OpenDB(filesDir string) (*DB, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	db, err := sqlx.ConnectContext(ctx, "sqlite3", filepath.Join(filesDir, "Letschat.db"))
-	if err == nil {
-		db.SetMaxOpenConns(5)
-		db.SetMaxIdleConns(5)
-		db.SetConnMaxIdleTime(15 * time.Minute)
-	}
-	if err != nil && db != nil {
-		db.Close()
-	}
-	return &DB{db}, err
-}*/
 
 func OpenDB(filesDir string, key int) (*DB, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

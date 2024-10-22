@@ -24,7 +24,6 @@ type DiscoverModel struct {
 	table          table.Model
 	tableUsrIDs    []string // user ids related to each row
 	metadata       domain.Metadata
-	totalPages     int
 	focusIdx       int // 0 -> Search, 1 -> Table
 	focus          bool
 	placeholder    string
@@ -184,10 +183,10 @@ func newDiscoverTable() table.Model {
 		Bold(false)
 
 	cols := []table.Column{
-		{"#", 6},
-		{"Name", 30},
-		{"Email", 45},
-		{"Joined Since", 20},
+		{Title: "#", Width: 6},
+		{Title: "Name", Width: 30},
+		{Title: "Email", Width: 45},
+		{Title: "Joined Since", Width: 20},
 	}
 	t := table.New(table.WithColumns(cols))
 	t.SetStyles(s)
@@ -207,7 +206,7 @@ func (m *DiscoverModel) handleDiscoverTableUpdate(msg tea.Msg) tea.Cmd {
 }
 
 func (m *DiscoverModel) handleDiscoverTableHeight() {
-	h := terminalHeight - 14
+	h := terminalHeight - 12
 	m.table.SetHeight(h)
 }
 
@@ -237,7 +236,7 @@ type tableResp struct {
 
 func (m DiscoverModel) searchUser(query string, page int) tea.Cmd {
 	return func() tea.Msg {
-		resp, err, code := m.client.SearchUser(query, page)
+		resp, code, err := m.client.SearchUser(query, page)
 		if code == 401 {
 			return requireAuthMsg{}
 		}

@@ -2,11 +2,15 @@ package tui
 
 import (
 	"github.com/M0hammadUsman/letschat/internal/client"
+	"github.com/M0hammadUsman/letschat/internal/domain"
 	"github.com/charmbracelet/bubbles/textarea"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/google/uuid"
 	zone "github.com/lrstanley/bubblezone"
+	"slices"
 	"strings"
+	"time"
 )
 
 const (
@@ -18,9 +22,10 @@ const (
 type ChatModel struct {
 	chatTxtarea  textarea.Model
 	chatViewport ChatViewportModel
-	focusIdx     int // 0 -> chatTxtarea, 1 -> chatViewport
 	focus        bool
 	client       *client.Client
+	onlineUsrIds []string
+	cb           convosBroadcast
 }
 
 func InitialChatModel(c *client.Client) ChatModel {
@@ -58,8 +63,11 @@ func (m ChatModel) Update(msg tea.Msg) (ChatModel, tea.Cmd) {
 		case "ctrl+s":
 			s := m.chatTxtarea.Value()
 			s = strings.TrimSpace(s)
+			if len(s) == 0 {
+				return m, nil
+			}
 			m.chatTxtarea.Reset()
-			return m, tea.Batch(m.sendMessage(s), m.handleChatTextareaUpdate(msg), m.handleChatViewportUpdate(msg))
+			return m, tea.Batch(m.sendMessage(s), m.handleChatTextareaUpdate(msg))
 		case "esc":
 			m.chatTxtarea.Blur()
 			m.updateChatTxtareaAndViewportDimensions()
@@ -86,16 +94,33 @@ func (m ChatModel) Update(msg tea.Msg) (ChatModel, tea.Cmd) {
 			}
 		default:
 		}
+		if zone.Get(chatTxtarea).InBounds(msg) {
+			cmd := m.chatTxtarea.Focus() // cmd must be fetched before the update of dimensions
+			m.updateChatTxtareaAndViewportDimensions()
+			return m, cmd
+		}
 		if zone.Get(chatViewport).InBounds(msg) {
 			m.chatTxtarea.Blur()
 			m.updateChatTxtareaAndViewportDimensions()
 		}
-		if zone.Get(chatTxtarea).InBounds(msg) {
-			cmd := m.chatTxtarea.Focus()
-			m.updateChatTxtareaAndViewportDimensions()
-			return m, cmd
+
+	case UsrOnlineMsg:
+		if !slices.Contains(m.onlineUsrIds, msg.SenderID) {
+			m.onlineUsrIds = append(m.onlineUsrIds, msg.SenderID)
 		}
+
+	case UsrOfflineMsg:
+		if slices.Contains(m.onlineUsrIds, msg.SenderID) {
+			for i, id := range m.onlineUsrIds {
+				if id == msg.SenderID {
+					m.onlineUsrIds = append(m.onlineUsrIds[:i-1], m.onlineUsrIds[i+1:]...)
+					break
+				}
+			}
+		}
+
 	}
+
 	return m, tea.Batch(m.handleChatTextareaUpdate(msg), m.handleChatViewportUpdate(msg))
 }
 
@@ -108,12 +133,20 @@ func (m ChatModel) View() string {
 			AlignVertical(lipgloss.Center).
 			Render(rabbit)
 	}
-	h := renderChatHeader(selUsername)
+	online := false
+	typing := false
+	if slices.Contains(m.onlineUsrIds, selUserID) {
+		online = true
+	}
+	h := renderChatHeader(selUsername, online, typing)
 	chatHeaderHeight = lipgloss.Height(h)
 	ta := zone.Mark(chatTxtarea, m.chatTxtarea.View())
 	ta = renderChatTextarea(ta, m.chatTxtarea.Focused())
 	chatTextareaHeight = lipgloss.Height(ta)
 	m.chatViewport.vp.Height = chatHeight() - (chatHeaderHeight + chatTextareaHeight)
+	if m.chatTxtarea.Focused() { // only works after setting vp height
+		m.chatViewport.vp.GotoBottom()
+	}
 	chatView := m.chatViewport.View()
 	chatView = zone.Mark(chatViewport, chatView)
 	c := lipgloss.JoinVertical(lipgloss.Top, h, chatView, ta)
@@ -138,14 +171,19 @@ func newChatTxtArea() textarea.Model {
 	return ta
 }
 
-func renderChatHeader(name string) string {
+func renderChatHeader(name string, online, typing bool) string {
 	c := chatHeaderStyle.Width(chatWidth())
 	menu := zone.Mark(chatMenu, "⚙️")
-	menuMarginLeft := max(0, c.GetWidth()-(c.GetHorizontalFrameSize()+lipgloss.Width(name)+lipgloss.Width(menu)))
+	sub := c.GetHorizontalFrameSize() + lipgloss.Width(name) + lipgloss.Width(menu) + lipgloss.Width(onlineIndicator)
+	menuMarginLeft := max(0, c.GetWidth()-sub)
 	menu = lipgloss.NewStyle().
 		MarginLeft(menuMarginLeft).
 		Render(menu)
-	return c.Render(name, menu)
+	s := onlineIndicator
+	if !online {
+		s = ""
+	}
+	return c.Render(name, s, menu)
 }
 
 func renderChatTextarea(ta string, padding bool) string {
@@ -181,13 +219,19 @@ func (m *ChatModel) updateChatTxtareaAndViewportDimensions() {
 }
 
 func (m *ChatModel) sendMessage(msg string) tea.Cmd {
+	t := time.Now()
+	msgToSnd := domain.Message{
+		ID:           uuid.New().String(),
+		SenderID:     m.client.CurrentUsr.ID,
+		ReceiverID:   selUserID,
+		Body:         msg,
+		SentAt:       &t,
+		Operation:    domain.CreateMsg,
+		Confirmation: 0,
+	}
+	go m.client.SendMessage(msgToSnd)
 	return func() tea.Msg {
-		if err := m.client.SendMessage(msg, selUserID); err != nil {
-			return &errMsg{
-				err:  "Unable to send message",
-				code: 0,
-			}
-		}
-		return nil
+		// will be used in ChatViewportModel's update method
+		return SentMsg(&msgToSnd)
 	}
 }

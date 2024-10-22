@@ -21,6 +21,11 @@ const (
 	conversationContainer = "conversationContainer"
 )
 
+type convosBroadcast struct {
+	ch    <-chan client.Convos
+	token int
+}
+
 type ConversationModel struct {
 	conversationList list.Model
 	// if there is a redirect from the discover tab then we add the selected user here,
@@ -31,11 +36,12 @@ type ConversationModel struct {
 	// getConversationListKeyMap, this will still update the model but make it look out of focus
 	focus  bool
 	client *client.Client
+	cb     convosBroadcast
 }
 
-type conversationItem struct{ id, selConvoUsrId, title, latestMsg string }
+type conversationItem struct{ id, selConvoUsrId, title, status, latestMsg string }
 
-func (i conversationItem) Title() string { return zone.Mark(i.id, i.title) }
+func (i conversationItem) Title() string { return zone.Mark(i.id, fmt.Sprint(i.title, i.status)) }
 func (i conversationItem) FilterValue() string {
 	return zone.Mark(i.id, fmt.Sprintf("%v|%v", i.title, i.selConvoUsrId))
 }
@@ -54,10 +60,16 @@ func InitialConversationModel(c *client.Client) ConversationModel {
 	m.SetShowTitle(false)
 	m.SetShowPagination(false)
 	m.StatusMessageLifetime = 2 * time.Second
+
+	token, ch := c.Conversations.Subscribe()
 	return ConversationModel{
 		conversationList: m,
 		focus:            true,
 		client:           c,
+		cb: convosBroadcast{
+			ch:    ch,
+			token: token,
+		},
 	}
 }
 
@@ -166,6 +178,9 @@ func (m ConversationModel) Update(msg tea.Msg) (ConversationModel, tea.Cmd) {
 		selUsername = msg.name
 		cmd := m.conversationList.InsertItem(0, populateConvoItem(-1, convo))
 		return m, cmd
+
+	case UsrOnlineMsg:
+
 	}
 
 	return m, tea.Batch(m.handleConversationListUpdate(msg))
@@ -250,20 +265,24 @@ func populateConvoItem(i int, convo *domain.Conversation) conversationItem {
 	} else {
 		latestMsg = "..."
 	}
-	item := conversationItem{id, convo.UserID, convo.Username, latestMsg}
+	s := renderStateInfo(convo)
+	item := conversationItem{id, convo.UserID, convo.Username, s, latestMsg}
 	return item
+}
+
+func renderStateInfo(convo *domain.Conversation) string {
+	t := convo.LastOnline
+	if t == nil {
+		return fmt.Sprint(" ", "🔥")
+	}
+	//d := time.Since(*t).Truncate(time.Minute)
+	return fmt.Sprint(" ", "❄️")
 }
 
 func containsSelConvo(convos []*domain.Conversation, convoUsrID string) bool {
 	return slices.ContainsFunc(convos, func(conversation *domain.Conversation) bool {
 		return convoUsrID == conversation.UserID
 	})
-}
-
-func (m *ConversationModel) handleConversationSearchTxtInput(msg tea.Msg) tea.Cmd {
-	var cmd tea.Cmd
-	m.conversationList.FilterInput, cmd = m.conversationList.FilterInput.Update(msg)
-	return cmd
 }
 
 func (m *ConversationModel) handleConversationListUpdate(msg tea.Msg) tea.Cmd {
@@ -282,7 +301,7 @@ func (m ConversationModel) getConversations() tea.Cmd {
 	return func() tea.Msg {
 		ctx := m.client.BT.GetShtdwnCtx()
 		c := make([]list.Item, 0)
-		convos := m.client.Conversations.WaitForStateChange()
+		convos := <-m.cb.ch
 		// we check if the ctx is done after unblocking
 		select {
 		case <-ctx.Done():
@@ -291,8 +310,6 @@ func (m ConversationModel) getConversations() tea.Cmd {
 		}
 		for i, convo := range convos {
 			if i == 0 { // add it to first idx
-				// selDisUserConvo is there, and it's not in the fetched list
-				// so we do not duplicate and affect the sel discovered user on dynamic fetch after wait
 				if m.selDiscUserConvo != nil && !containsSelConvo(convos, m.selDiscUserConvo.UserID) {
 					c = append(c, populateConvoItem(-1, m.selDiscUserConvo))
 				}

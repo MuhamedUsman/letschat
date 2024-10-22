@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"runtime/debug"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -40,6 +42,7 @@ func (bt *BackgroundTask) Run(fn func(shtdwnCtx context.Context)) {
 			bt.Tasks--
 			if r := recover(); r != nil {
 				slog.Error(fmt.Errorf("%v", r).Error())
+				debug.PrintStack()
 			}
 		}()
 		fn(bt.ctx)
@@ -57,6 +60,7 @@ func (bt *BackgroundTask) Shutdown(timeout time.Duration) error {
 	case <-wait:
 		return nil
 	case <-time.After(timeout):
+		slog.Error(strconv.Itoa(bt.Tasks))
 		return fmt.Errorf("shutdown timeout, some background tasks may not have finished")
 	}
 }

@@ -6,14 +6,23 @@ import (
 	"time"
 )
 
-type MessageOperation int
+// MsgOperation must not have math.MinInt8 value
+type MsgOperation int
 
 const (
-	CreateMsg MessageOperation = iota
+	CreateMsg MsgOperation = iota
 	UpdateMsg
 	DeleteMsg
 	UserOnlineMsg
 	UserOfflineMsg
+)
+
+// Confirmation only be used on frontend side
+type Confirmation int
+
+const (
+	MsgDeliveredConfirmed Confirmation = iota + 1
+	MsgReadConfirmed
 )
 
 var (
@@ -21,15 +30,16 @@ var (
 )
 
 type Message struct {
-	ID          string           `json:"id,omitempty"`
-	SenderID    string           `json:"senderID,omitempty"    db:"sender_id"`
-	ReceiverID  string           `json:"receiverID,omitempty"  db:"receiver_id"`
-	Body        string           `json:"body,omitempty"`
-	SentAt      *time.Time       `json:"sentAt,omitempty"      db:"sent_at"`
-	DeliveredAt *time.Time       `json:"deliveredAt,omitempty" db:"delivered_at"`
-	ReadAt      *time.Time       `json:"readAt,omitempty"      db:"read_at"`
-	Version     int              `json:"-"`
-	Operation   MessageOperation `json:"operation"`
+	ID           string       `json:"id,omitempty"`
+	SenderID     string       `json:"senderID,omitempty"    db:"sender_id"`
+	ReceiverID   string       `json:"receiverID,omitempty"  db:"receiver_id"`
+	Body         string       `json:"body,omitempty"`
+	SentAt       *time.Time   `json:"sentAt,omitempty"      db:"sent_at"`
+	DeliveredAt  *time.Time   `json:"deliveredAt,omitempty" db:"delivered_at"`
+	ReadAt       *time.Time   `json:"readAt,omitempty"      db:"read_at"`
+	Confirmation Confirmation `json:"-"`
+	Version      int          `json:"-"`
+	Operation    MsgOperation `json:"operation"`
 }
 
 type MsgChan chan *Message
@@ -56,13 +66,13 @@ type MessageRepository interface {
 // DTO
 
 type MessageSent struct {
-	ID          *string          `json:"id"`
-	ReceiverID  string           `json:"receiverID"`
-	Body        *string          `json:"body"`
-	SentAt      *time.Time       `json:"sentAt"`
-	DeliveredAt *time.Time       `json:"deliveredAt"`
-	ReadAt      *time.Time       `json:"readAt"`
-	Operation   MessageOperation `json:"operation"`
+	ID          *string      `json:"id"`
+	ReceiverID  string       `json:"receiverID"`
+	Body        *string      `json:"body"`
+	SentAt      *time.Time   `json:"sentAt"`
+	DeliveredAt *time.Time   `json:"deliveredAt"`
+	ReadAt      *time.Time   `json:"readAt"`
+	Operation   MsgOperation `json:"operation"`
 }
 
 type LatestMsgBody struct {

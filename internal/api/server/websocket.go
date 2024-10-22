@@ -200,7 +200,9 @@ func (s *Server) broadcastUserOnlineStatus(ctx context.Context, u *domain.User, 
 			SentAt:    &t,
 			Operation: op,
 		}
-		s.Subscribers[convo.UserID].Messages <- &msg
+		if v, ok := s.Subscribers[convo.UserID]; ok {
+			v.Messages <- &msg
+		}
 	}
 	return nil
 }

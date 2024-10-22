@@ -1,7 +1,6 @@
 package server
 
 import (
-	"github.com/coder/websocket"
 	"log/slog"
 	"net/http"
 
@@ -75,18 +74,4 @@ func (s *Server) noSubscriptionResponse(w http.ResponseWriter, r *http.Request) 
 func (s *Server) redundantSubscription(w http.ResponseWriter, r *http.Request) {
 	message := "single instance of subscription is allowed for this account"
 	s.errorResponse(w, r, http.StatusConflict, message)
-}
-
-// Websocket Errors ----------------------------------------------------------------------------------------------------
-
-func (s *Server) wsServerErrorResponse(conn *websocket.Conn, err error) {
-	slog.Error(err.Error())
-	debug.PrintStack()
-	message := "the server encountered a problem and could not process your request"
-	conn.Close(websocket.StatusInternalError, message)
-}
-
-func (s *Server) wsInvalidJsonResponse(conn *websocket.Conn) {
-	message := "invalid JSON message body"
-	conn.Close(websocket.StatusInvalidFramePayloadData, message)
 }

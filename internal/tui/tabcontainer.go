@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 	zone "github.com/lrstanley/bubblezone"
+	"log"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -19,6 +20,11 @@ import (
 // once ioStatus is not zero valued & spinnerSpinCmd is returned,
 // TabContainerModel.spinner will spin with ioStatus until spinnerResetCmd
 var ioStatus string
+
+type LoginStateBroadcast struct {
+	ch    <-chan client.LoginState
+	token int
+}
 
 // TabContainerModel -> main TUI model for this application
 type TabContainerModel struct {
@@ -31,6 +37,7 @@ type TabContainerModel struct {
 	stopwatch stopwatch.Model
 	spinner   *spinner.Model
 	client    *client.Client
+	lsb       LoginStateBroadcast
 }
 
 func InitialTabContainerModel() TabContainerModel {
@@ -54,6 +61,11 @@ func InitialTabContainerModel() TabContainerModel {
 }
 
 func (m TabContainerModel) Init() tea.Cmd {
+	token, ch := m.client.LoginState.Subscribe()
+	m.lsb = LoginStateBroadcast{
+		ch:    ch,
+		token: token,
+	}
 	return tea.Batch(
 		m.discover.Init(),
 		m.letschat.Init(),
@@ -70,9 +82,20 @@ func (m TabContainerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		terminalHeight = msg.Height
 		terminalWidth = msg.Width
 
+	case tea.FocusMsg:
+		log.Println(msg)
+		flag := true
+		terminalFocus = &flag
+
+	case tea.BlurMsg:
+		log.Println(msg)
+		flag := false
+		terminalFocus = &flag
+
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c":
+			m.unsubBroadcasts()
 			if err := m.client.BT.Shutdown(5 * time.Second); err != nil {
 				slog.Error(err.Error())
 			}
@@ -107,6 +130,8 @@ func (m TabContainerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case requireAuthMsg:
+		// must unsubscribe before redirecting to some other model
+		m.unsubBroadcasts()
 		loginModel := InitialLoginModel()
 		return loginModel, loginModel.Init()
 
@@ -168,7 +193,7 @@ func (m TabContainerModel) View() string {
 	if m.client.CurrentUsr != nil {
 		t = renderTabsWithGapsAndText(t, m.client.CurrentUsr.Name, s, m.client.WsConnState.Get())
 	} else {
-		// conn State will be ignored in this case
+		// conn Confirmation will be ignored in this case
 		t = renderTabsWithGapsAndText(t, "", s, m.client.WsConnState.Get())
 	}
 	content := m.populateActiveTabContent()
@@ -293,7 +318,7 @@ func (m *TabContainerModel) populateActiveTabContent() string {
 func (m TabContainerModel) readOnUsrLoggedInChan() tea.Cmd {
 	return func() tea.Msg {
 		for {
-			return m.client.LoginState.WaitForStateChange()
+			return <-m.lsb.ch
 		}
 	}
 }
@@ -304,4 +329,10 @@ func (m TabContainerModel) runStartUpProcesses() tea.Cmd {
 		m.client.RunStartupProcesses()
 		return nil
 	}
+}
+
+func (m TabContainerModel) unsubBroadcasts() {
+	m.client.LoginState.Unsubscribe(m.lsb.token)
+	m.client.Conversations.Unsubscribe(m.letschat.conversation.cb.token)
+	m.client.RecvMsgs.Unsubscribe(m.letschat.chat.chatViewport.mb.token)
 }

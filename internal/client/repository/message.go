@@ -43,22 +43,29 @@ func (r LocalMessageRepository) GetLatestMsgBodyForConvos(cui ...string) (Latest
 
 func (r LocalMessageRepository) GetMsgByID(id string) (*domain.Message, error) {
 	query := `
-		SELECT * FROM message WHERE id = $1
+		SELECT id, sender_id, receiver_id, body, sent_at, delivered_at, read_at, confirmation, version
+		FROM message
+		WHERE id = $1
 	`
 	var msg domain.Message
-	if err := r.db.QueryRowx(query, id).StructScan(&msg); err != nil {
+	var SentAt, DeliveredAt, ReadAt *string
+	args := []any{&msg.ID, &msg.SenderID, &msg.ReceiverID, &msg.Body, &SentAt, &DeliveredAt, &ReadAt, &msg.Confirmation, &msg.Version}
+	if err := r.db.QueryRow(query, id).Scan(args...); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, domain.ErrRecordNotFound
 		}
 		return nil, err
 	}
+	msg.SentAt, _ = parseTime(SentAt)
+	msg.DeliveredAt, _ = parseTime(DeliveredAt)
+	msg.ReadAt, _ = parseTime(ReadAt)
 	return &msg, nil
 }
 
 func (r LocalMessageRepository) SaveMsg(msg *domain.Message) error {
 	query := `
-		INSERT INTO message (id, sender_id, receiver_id, body, sent_at, delivered_at, read_at)
-		VALUES (:id, :sender_id, :receiver_id, :body, :sent_at, :delivered_at, :read_at)
+		INSERT INTO message (id, sender_id, receiver_id, body, sent_at, delivered_at, read_at, confirmation)
+		VALUES (:id, :sender_id, :receiver_id, :body, :sent_at, :delivered_at, :read_at, :confirmation)
 	`
 	_, err := r.db.NamedExec(query, msg)
 	return err
@@ -67,14 +74,14 @@ func (r LocalMessageRepository) SaveMsg(msg *domain.Message) error {
 func (r LocalMessageRepository) UpdateMsg(msg *domain.Message) error {
 	query := `
 		UPDATE message 
-		SET delivered_at = :delivered_at, read_at = :read_at, version = version + 1
+		SET delivered_at = :delivered_at, read_at = :read_at, confirmation = :confirmation, version = version + 1
 		WHERE id = :id AND version = :version
 	`
 	res, err := r.db.NamedExec(query, msg)
 	if err != nil {
 		return err
 	}
-	rows, err := res.RowsAffected()
+	rows, _ := res.RowsAffected()
 	if rows == 0 {
 		return domain.ErrEditConflict
 	}
@@ -94,7 +101,7 @@ func (r LocalMessageRepository) GetMsgsAsPage(
 	fil domain.Filter,
 ) ([]*domain.Message, *domain.Metadata, error) {
 	query := `
-		SELECT COUNT(*) OVER(), id, sender_id, receiver_id, body, sent_at, delivered_at, read_at, version
+		SELECT COUNT(*) OVER(), id, sender_id, receiver_id, body, sent_at, delivered_at, read_at, confirmation, version
 		FROM message
 		WHERE sender_id = $1 OR receiver_id = $1
 		ORDER BY sent_at DESC
@@ -108,7 +115,7 @@ func (r LocalMessageRepository) GetMsgsAsPage(
 	for rows.Next() {
 		var m domain.Message
 		var SentAt, DeliveredAt, ReadAt *string
-		args = []any{&TotalRows, &m.ID, &m.SenderID, &m.ReceiverID, &m.Body, &SentAt, &DeliveredAt, &ReadAt, &m.Version}
+		args = []any{&TotalRows, &m.ID, &m.SenderID, &m.ReceiverID, &m.Body, &SentAt, &DeliveredAt, &ReadAt, &m.Confirmation, &m.Version}
 		if err := rows.Scan(args...); err != nil {
 			return nil, &domain.Metadata{}, err
 		}

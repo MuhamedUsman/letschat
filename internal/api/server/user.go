@@ -99,6 +99,13 @@ func (s *Server) SearchUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	users, metadata, err := s.Facade.SearchUser(r.Context(), queryParam, filter)
+	if err != nil {
+		if errors.Is(err, domain.ErrRecordNotFound) {
+			s.notFoundResponse(w, r)
+			return
+		}
+		s.serverErrorResponse(w, r, err)
+	}
 	if err = s.writeJSON(w, envelop{"users": users, "metadata": metadata}, http.StatusOK, nil); err != nil {
 		s.serverErrorResponse(w, r, err)
 	}

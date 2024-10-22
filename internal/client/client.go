@@ -26,14 +26,14 @@ type Client struct {
 	FilesDir string
 	// currently logged-in user we fetch and populates this once there is a read from UsrLogin chan
 	CurrentUsr  *domain.User
-	WsConnState *WsConnMonitor
-	LoginState  *LoginMonitor
-	RecvMsgs    *RecvMsgsMonitor
+	WsConnState *WsConnBroadcaster
+	LoginState  *LoginBroadcaster
+	RecvMsgs    *RecvMsgsBroadcaster
 	// these are the conversations of the user displayed on the left side of the Conversations tab
 	// once there is a ws conn they will be updated by current online status updates
 	// if the connection is offline they will be fetched by the local db for offline view
 	// we've to wait for state change to get updated conversations, they will be auto updated on WsConnState changes
-	Conversations *ConversationsMonitor
+	Conversations *ConvosBroadcaster
 	// runs the tasks that needs a graceful shutdown, using BackgroundTask.Run
 	BT *common.BackgroundTask
 	// RunStartupProcesses runs long living processes, which dies on shutdown, some chores and
@@ -65,10 +65,10 @@ func Init(key int) error {
 		}
 		c.AuthToken = c.krm.getAuthTokenFromKeyring()
 		c.BT = common.NewBackgroundTask()
-		c.WsConnState = newWsConnMonitor()
-		c.LoginState = newLoginMonitor()
-		c.Conversations = newConversationsMonitor()
-		c.RecvMsgs = newRecvMsgsStateMonitor()
+		c.WsConnState = newWsConnBroadcaster()
+		c.LoginState = newLoginBroadcaster()
+		c.Conversations = newConvosBroadcaster()
+		c.RecvMsgs = newRecvMsgsBroadcaster()
 		// Connecting to sqlite
 		c.db, err = repository.OpenDB(c.FilesDir, key)
 		if err != nil {
@@ -96,7 +96,7 @@ func Init(key int) error {
 			if errors.Is(err, domain.ErrRecordNotFound) {
 				// as we cannot find the user in the db, user needs to log in again so
 				// tui.TabContainerModel can redirect user to log-in page
-				c.LoginState.WriteToChan(false)
+				c.LoginState.Write(false)
 			}
 		}
 		c.CurrentUsr = u

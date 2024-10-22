@@ -2,6 +2,7 @@ package tui
 
 import (
 	"errors"
+	"github.com/M0hammadUsman/letschat/internal/domain"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -37,3 +38,9 @@ func spinnerResetCmd() tea.Msg { return resetSpinnerMsg{} }
 type selDiscUserMsg struct { // selected Discovered User Msg
 	id, name, email string
 }
+
+type SentMsg *domain.Message
+
+type UsrOnlineMsg *domain.Message
+
+type UsrOfflineMsg *domain.Message

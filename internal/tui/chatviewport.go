@@ -1,11 +1,13 @@
 package tui
 
 import (
+	"context"
 	"github.com/M0hammadUsman/letschat/internal/client"
 	"github.com/M0hammadUsman/letschat/internal/domain"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"log/slog"
 	"slices"
 	"strings"
 	"time"
@@ -16,6 +18,11 @@ type msgPage struct {
 	meta *domain.Metadata
 }
 
+type msgBroadcast struct {
+	ch    <-chan *domain.Message
+	token int
+}
+
 type ChatViewportModel struct {
 	vp                 viewport.Model
 	msgs               []*domain.Message
@@ -23,14 +30,21 @@ type ChatViewportModel struct {
 	selUsrID           string
 	focus              bool
 	fetching           bool
+	prevLineCount      int
 	client             *client.Client
+	mb                 msgBroadcast
 }
 
 func InitialChatViewport(c *client.Client) ChatViewportModel {
+	token, ch := c.RecvMsgs.Subscribe()
 	return ChatViewportModel{
 		vp:     viewport.New(0, 0),
 		msgs:   make([]*domain.Message, 0),
 		client: c,
+		mb: msgBroadcast{
+			ch:    ch,
+			token: token,
+		},
 	}
 }
 
@@ -70,18 +84,55 @@ func (m ChatViewportModel) Update(msg tea.Msg) (ChatViewportModel, tea.Cmd) {
 		m.currPage = msg.meta.CurrentPage
 		m.lastPage = msg.meta.LastPage
 		m.vp.SetContent(m.renderChatViewport())
-		m.vp.GotoBottom()
+		// Once we set the content it takes us to the top, we want to go to the point where the user were before
+		c := m.vp.TotalLineCount() - m.prevLineCount
+		m.vp.LineDown(c)
+		// Now update the prev line count
+		m.prevLineCount = m.vp.TotalLineCount()
 		return m, m.handleChatViewportUpdate(msg)
 	case *domain.Message:
 		switch msg.Operation {
 		case domain.CreateMsg:
-			m.msgs = append(m.msgs, msg)
+			m.msgs = append([]*domain.Message{msg}, m.msgs...)
 			m.vp.SetContent(m.renderChatViewport())
 			m.vp.GotoBottom()
-			return m, tea.Batch(m.listenForMessages(), m.handleChatViewportUpdate(msg))
+			// set it as read also | nil check, if the terminal focus is not supported, just set the msg as read
+			if msg.SenderID == selUserID && msg.ReadAt == nil && (terminalFocus == nil || *terminalFocus) {
+				t := time.Now()
+				msg.ReadAt = &t
+				m.setMsgAsRead(msg)
+			}
 		case domain.UpdateMsg:
-
+			m.updateMsgInMsgs(msg)
+			// the above op will update the msgs so we need to rerender
+			m.vp.SetContent(m.renderChatViewport())
+		/*case domain.UserOnlineMsg:
+			// throw this msg out, and pick it in tui.ConversationModel
+			return m, func() tea.Msg { return UsrOnlineMsg(msg) }
+		case domain.UserOfflineMsg:
+			// throw this msg out, and pick it in tui.ConversationModel
+			return m, func() tea.Msg { return UsrOfflineMsg(msg) }*/
+		default:
 		}
+
+		switch msg.Confirmation {
+		case domain.MsgDeliveredConfirmed, domain.MsgReadConfirmed:
+			for i, ms := range m.msgs {
+				if ms.ID == msg.ID {
+					m.msgs[i] = msg
+					m.vp.SetContent(m.renderChatViewport())
+					break
+				}
+			}
+		default:
+		}
+		return m, tea.Batch(m.listenForMessages(), m.handleChatViewportUpdate(msg))
+
+	case SentMsg: // the message we'll send gets here once delivered successfully
+		m.msgs = append([]*domain.Message{msg}, m.msgs...)
+		m.vp.SetContent(m.renderChatViewport())
+		m.vp.LineDown(3) // GotoBottom does not work here as intended
+		return m, m.handleChatViewportUpdate(msg)
 	}
 	return m, m.handleChatViewportUpdate(msg)
 }
@@ -92,15 +143,13 @@ func (m ChatViewportModel) View() string {
 
 // Helpers & Stuff -----------------------------------------------------------------------------------------------------
 
-func newChatViewport(w, h int) viewport.Model {
-	vp := viewport.New(w, h)
-	vp.MouseWheelEnabled = true
-	return vp
-}
-
 func (m *ChatViewportModel) renderChatViewport() string {
 	var sb strings.Builder
 	var prevMsgDay int
+	l, err := time.LoadLocation("Local")
+	if err != nil {
+		slog.Error(err.Error())
+	}
 	cb := chatBubbleContainer.Width(chatWidth() - chatBubbleContainer.GetHorizontalFrameSize())
 	for i := len(m.msgs) - 1; i >= 0; i-- {
 		msg := m.msgs[i]
@@ -111,7 +160,7 @@ func (m *ChatViewportModel) renderChatViewport() string {
 				Background(primaryContrastColor).
 				Padding(0, 1).
 				Italic(true).
-				Render(msg.SentAt.Format("January 02, 2006"))
+				Render(msg.SentAt.In(l).Format("January 02, 2006"))
 			sb.WriteString("\n\n")
 			s = cb.Align(lipgloss.Center).Italic(true).Render(s)
 			sb.WriteString(s)
@@ -137,7 +186,10 @@ func (m *ChatViewportModel) renderBubbleWithStatusInfo(msg *domain.Message) stri
 	bubble := chatBubbleLStyle.Width(txtWidth).Render(msg.Body)
 	sentAt := lipgloss.NewStyle().Faint(true).Foreground(whiteColor).SetString(msg.SentAt.Format(time.Kitchen))
 
-	status := "⁎"
+	var status string
+	if msg.SentAt != nil {
+		status = "⁎"
+	}
 	if msg.DeliveredAt != nil {
 		status = "⁑"
 	}
@@ -167,14 +219,8 @@ func (m *ChatViewportModel) handleChatViewportUpdate(msg tea.Msg) tea.Cmd {
 
 func (m ChatViewportModel) listenForMessages() tea.Cmd {
 	return func() tea.Msg {
-		ctx := m.client.BT.GetShtdwnCtx()
 		for {
-			msg := m.client.RecvMsgs.WaitForStateChange()
-			select {
-			case <-ctx.Done():
-				return nil
-			default:
-			}
+			msg := <-m.mb.ch
 			if msg == nil {
 				return nil
 			}
@@ -188,7 +234,7 @@ func (m ChatViewportModel) listenForMessages() tea.Cmd {
 
 func (m ChatViewportModel) getMsgAsPage(p int) tea.Cmd {
 	return func() tea.Msg {
-		msgs, meta, err := m.client.GetMessagesAsPage(selUserID, p)
+		msgs, meta, err := m.client.GetMessagesAsPageAndMarkAsRead(selUserID, p)
 		if err != nil {
 			return &errMsg{
 				err:  "Unable to fetch initial chat for this user...",
@@ -197,4 +243,25 @@ func (m ChatViewportModel) getMsgAsPage(p int) tea.Cmd {
 		}
 		return msgPage{msgs, meta}
 	}
+}
+
+func (m *ChatViewportModel) updateMsgInMsgs(msg *domain.Message) {
+	for i, imsg := range m.msgs {
+		if imsg.ID == msg.ID {
+			if msg.DeliveredAt != nil {
+				imsg.DeliveredAt = msg.DeliveredAt
+			}
+			if msg.ReadAt != nil {
+				imsg.ReadAt = msg.ReadAt
+			}
+			m.msgs[i] = imsg
+			break
+		}
+	}
+}
+
+func (m ChatViewportModel) setMsgAsRead(msg *domain.Message) {
+	m.client.BT.Run(func(shtdwnCtx context.Context) {
+		_ = m.client.SetMsgAsRead(msg) // ignore as we can retry
+	})
 }

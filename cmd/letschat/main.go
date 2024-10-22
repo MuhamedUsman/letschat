@@ -30,7 +30,13 @@ func main() {
 	defer f.Close()
 
 	zone.NewGlobal()
-	_, err = tea.NewProgram(tui.InitialTabContainerModel(), tea.WithAltScreen(), tea.WithMouseAllMotion()).Run()
+	_, err = tea.NewProgram(
+		tui.InitialTabContainerModel(),
+		tea.WithAltScreen(),
+		tea.WithMouseAllMotion(),
+		tea.WithoutBracketedPaste(),
+		tea.WithReportFocus(),
+	).Run()
 	if err != nil {
 		slogger.Error(err.Error())
 		os.Exit(1)

@@ -5,62 +5,73 @@ import (
 	"sync"
 )
 
-type StateMonitor[T any] struct {
-	c    chan T
-	cond *sync.Cond
-	s    T
+// Broadcaster reads from one chan and writes to many subscribed chans, Subscribe will return a token, and a
+// receive-only chan for reads, Unsubscribe must be called with the token to close the subscription,
+// if not called, the system will not shut down gracefully
+// Broadcast must be called in a separate long-running goroutine, this will not return even if there are no subscribers
+// to relay msgs to, Broadcast will only return once shutdown is initiated
+type Broadcaster[T any] struct {
+	in   chan T
+	mu   sync.RWMutex
+	wg   sync.WaitGroup
+	out  map[int]chan T
+	v    T
+	next int
 }
 
-func NewStatus[T any](initial T) *StateMonitor[T] {
-	return &StateMonitor[T]{
-		c:    make(chan T),
-		cond: sync.NewCond(new(sync.Mutex)),
-		s:    initial,
+func NewBroadcaster[T any]() *Broadcaster[T] {
+	return &Broadcaster[T]{
+		in:  make(chan T),
+		wg:  sync.WaitGroup{},
+		out: make(map[int]chan T),
 	}
 }
 
-// Get will return the underlying conditioned variable, keep in mind it will be affected by race conditions
-func (s *StateMonitor[T]) Get() T {
-	return s.s
+func (b *Broadcaster[T]) Get() T {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	return b.v
 }
 
-// GetAndBlock will return the underlying conditioned variable, keep in mind you must call Unblock after you're done
-func (s *StateMonitor[T]) GetAndBlock() T {
-	s.cond.L.Lock()
-	return s.s
+func (b *Broadcaster[T]) Subscribe() (int, <-chan T) {
+	c := make(chan T, 1)
+	b.mu.Lock()
+	token := b.next
+	b.out[token] = c
+	b.next++
+	b.wg.Add(1)
+	b.mu.Unlock()
+	return token, c
 }
 
-func (s *StateMonitor[T]) Unblock() {
-	s.cond.L.Unlock()
+func (b *Broadcaster[T]) Unsubscribe(token int) {
+	b.mu.Lock()
+	if ch, ok := b.out[token]; ok {
+		close(ch)
+		delete(b.out, token)
+		b.wg.Done()
+	}
+	b.mu.Unlock()
 }
 
-// WaitForStateChange will block until there is a state change broadcast internally
-func (s *StateMonitor[T]) WaitForStateChange() T {
-	s.cond.L.Lock()
-	s.cond.Wait()
-	defer s.cond.L.Unlock()
-	return s.s
+func (b *Broadcaster[T]) Write(v T) {
+	b.in <- v
 }
 
-// WriteToChan writes the passed value to the chan
-func (s *StateMonitor[T]) WriteToChan(v T) {
-	s.c <- v
-}
-
-// Broadcast reads on the chan once there is a read it updates the conditioned variable and broadcasts
-// Broadcast must be called on startup in a separate goroutine
-func (s *StateMonitor[T]) Broadcast(shtdwnCtx context.Context) {
+func (b *Broadcaster[T]) Broadcast(shtdwnCtx context.Context) {
 	for {
 		select {
-		case val := <-s.c:
-			s.cond.L.Lock()
-			s.s = val
-			s.cond.L.Unlock()
-			s.cond.Broadcast()
+		case v := <-b.in:
+			b.v = v
+			b.mu.RLock() // reading from the map and writing to what we'll read, that's why RLock
+			for _, ch := range b.out {
+				// this may block, but we want one on one synchronization
+				// if it blocks indefinitely, there is problem elsewhere in the code
+				ch <- v
+			}
+			b.mu.RUnlock()
 		case <-shtdwnCtx.Done():
-			// all the goroutines that waits for the broadcast also respects the shtdwnCtx so after the wait
-			// they first check the shtdwnCtx if that's done they will exit
-			s.cond.Broadcast()
+			b.wg.Wait()
 			return
 		}
 	}

@@ -10,7 +10,7 @@ var (
 	ErrNonActiveUser    = errors.New("not activated")
 	ErrUnauthorized     = errors.New("invalid credentials")
 	// ErrApplication code is 0
-	ErrApplication = errors.New("Your side of application have encountered an error, if the error persists you may report this issue to the developer at https://github.com/M0hammadUsman/letschat.")
+	ErrApplication = errors.New("your side of application have encountered an error, if the error persists you may report this issue to the developer at https://github.com/M0hammadUsman/letschat")
 )
 
 func getMostNestedError(err error) error {

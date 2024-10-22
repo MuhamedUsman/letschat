@@ -50,9 +50,9 @@ func (k *keyringManager) getAuthTokenFromKeyring() string {
 	}
 	return string(token.Data)*/
 	if k.key == 1 {
-		return "GUQN537LHKSBFGVIKWDRX4OVVQ"
+		return "Y4RSVW7S2YC5B3D3VNUTB45P7A"
 	} else if k.key == 2 {
-		return "CADIW626IRRD67XM7N4XXCPTYA"
+		return "J2FPEBTJ2SM5SBFCB7H66U3UWA"
 	}
 	return ""
 }

@@ -17,10 +17,10 @@ import (
 
 // LoginState true -> successful login, false -> unauthorized requires login
 type LoginState bool
-type LoginMonitor = sync.StateMonitor[LoginState]
+type LoginBroadcaster = sync.Broadcaster[LoginState]
 
-func newLoginMonitor() *LoginMonitor {
-	return sync.NewStatus[LoginState](false)
+func newLoginBroadcaster() *LoginBroadcaster {
+	return sync.NewBroadcaster[LoginState]()
 }
 
 // Register will register the user & populate the *domain.UserRegister with validation errors
@@ -105,7 +105,7 @@ func (c *Client) Login(u domain.UserAuth) error {
 		return err
 	}
 	// signal an authenticated user
-	c.LoginState.WriteToChan(true)
+	c.LoginState.Write(true)
 	return nil
 }
 
@@ -139,11 +139,11 @@ type PagedUserResponse struct {
 	Users    []domain.User   `json:"users"`
 }
 
-func (c *Client) SearchUser(param string, page int) (*PagedUserResponse, error, int) {
+func (c *Client) SearchUser(param string, page int) (*PagedUserResponse, int, error) {
 	r, err := http.NewRequest(http.MethodGet, searchUser, nil)
 	if err != nil {
 		slog.Error(err.Error())
-		return nil, ErrApplication, 0
+		return nil, 0, ErrApplication
 	}
 	r.Header.Set("Authorization", "Bearer "+c.AuthToken)
 	v := r.URL.Query()
@@ -153,29 +153,29 @@ func (c *Client) SearchUser(param string, page int) (*PagedUserResponse, error, 
 	resp, err := http.DefaultClient.Do(r)
 	if err != nil {
 		slog.Error(err.Error())
-		return nil, getMostNestedError(err), http.StatusServiceUnavailable
+		return nil, http.StatusServiceUnavailable, getMostNestedError(err)
 	}
 	defer resp.Body.Close()
 	readBody, _ := io.ReadAll(resp.Body)
 	var pur PagedUserResponse
 	if err = json.Unmarshal(readBody, &pur); err != nil {
 		slog.Error(err.Error())
-		return nil, ErrApplication, 0
+		return nil, 0, ErrApplication
 	}
-	return &pur, nil, resp.StatusCode
+	return &pur, resp.StatusCode, nil
 }
 
-func (c *Client) GetCurrentActiveUser() (*domain.User, error, int) {
+func (c *Client) GetCurrentActiveUser() (*domain.User, int, error) {
 	r, err := http.NewRequest(http.MethodGet, getCurrentActiveUser, nil)
 	if err != nil {
 		slog.Error(err.Error())
-		return nil, ErrApplication, 0
+		return nil, 0, ErrApplication
 	}
 	r.Header.Set("Authorization", "Bearer "+c.AuthToken)
 	resp, err := http.DefaultClient.Do(r)
 	if err != nil {
 		slog.Error(err.Error())
-		return nil, getMostNestedError(err), http.StatusServiceUnavailable
+		return nil, http.StatusServiceUnavailable, getMostNestedError(err)
 	}
 	defer resp.Body.Close()
 	readBody, _ := io.ReadAll(resp.Body)
@@ -184,24 +184,25 @@ func (c *Client) GetCurrentActiveUser() (*domain.User, error, int) {
 	}
 	if err = json.Unmarshal(readBody, &response); err != nil {
 		slog.Error(err.Error())
-		return nil, ErrApplication, 0
+		return nil, 0, ErrApplication
 	}
-	return &response.User, nil, resp.StatusCode
+	return &response.User, resp.StatusCode, nil
 }
 
-// ManageUserLogins listens for state change on LoginMonitor, and on user login saves the user to db,
+// ManageUserLogins listens for state change on LoginBroadcaster, and on user login saves the user to db,
 // if the user is not the one previously in the db, it will delete the db and creates a new one
 // ensuring brand-new db for a newly logged-in user, does this while deleting previous user if any
 func (c *Client) manageUserLogins(shtdwnCtx context.Context) {
+	token, ch := c.LoginState.Subscribe()
+	defer c.LoginState.Unsubscribe(token)
 	for {
-		s := c.LoginState.WaitForStateChange()
 		select {
+		case s := <-ch:
+			if !s { // if not login
+				continue
+			}
 		case <-shtdwnCtx.Done():
 			return
-		default:
-		}
-		if !s {
-			continue
 		}
 		u, _, _ := c.GetCurrentActiveUser()
 		c.CurrentUsr = u

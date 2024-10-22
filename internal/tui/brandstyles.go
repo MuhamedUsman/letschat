@@ -9,8 +9,9 @@ import (
 var ( // Global Styling
 
 	// These will be updated by any of the activeTab TabContainerModel
-	terminalWidth  = 100
-	terminalHeight = 20
+	terminalWidth  int
+	terminalHeight int
+	terminalFocus  *bool // only read the msg once the terminal in focus
 
 	primaryColor           = lipgloss.AdaptiveColor{Light: "#4b3b00", Dark: "#FFC700"}
 	primarySubtleDarkColor = lipgloss.AdaptiveColor{Light: "#6c5300", Dark: "#8b7000"}
@@ -228,8 +229,6 @@ var (
 
 	chatHeaderHeight, chatTextareaHeight int // used by ChatModel.chatViewport for its height calculations
 
-	chatViewportStyle = lipgloss.NewStyle()
-
 	chatTxtareaStyle = lipgloss.NewStyle().
 				BorderStyle(lipgloss.NormalBorder()).
 				BorderTop(true).
@@ -272,6 +271,11 @@ var (
 				BorderForeground(primaryColor).
 				Padding(0, 1).
 				Foreground(primaryColor)
+
+	onlineIndicator = lipgloss.NewStyle().
+			Foreground(greenColor).
+			Inline(true).
+			Render("●")
 )
 
 var ( // Bunny Stying
