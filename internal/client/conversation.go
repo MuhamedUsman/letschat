@@ -34,6 +34,7 @@ func (c *Client) populateConversationsAccordingToWsConnState(shtdwnCtx context.C
 			case Connected:
 				convos, code, err := c.getConversations()
 				if err != nil { // fetch from db
+					// TODO: This is bad, if we fetch from db on connected state on application startup we will show outdated lastOnline status
 					convos, err = c.repo.GetConversations()
 					if err != nil {
 						log.Fatal(err)
@@ -42,16 +43,14 @@ func (c *Client) populateConversationsAccordingToWsConnState(shtdwnCtx context.C
 				if code == http.StatusUnauthorized {
 					c.LoginState.Write(false) // user will be redirected to log-in by tui
 				} else {
-					c.populateConvosAndWriteToChan(convos)
-					_ = c.repo.DeleteAllConversations()
-					_ = c.repo.SaveConversations(convos...) // ignore the error
+					c.saveConvosAndWriteToChan(convos)
 				}
 			case Disconnected:
 				convos, err := c.repo.GetConversations()
 				if err != nil {
 					log.Fatal(err)
 				}
-				c.populateConvosAndWriteToChan(convos)
+				c.saveConvosAndWriteToChan(convos)
 			default:
 			}
 		case <-shtdwnCtx.Done():
@@ -84,7 +83,7 @@ func (c *Client) getConversations() ([]*domain.Conversation, int, error) {
 	return res.Conversations, resp.StatusCode, nil
 }
 
-func (c *Client) populateConvosAndWriteToChan(convos []*domain.Conversation) {
+func (c *Client) populateConvosWithLatestMsgs(convos []*domain.Conversation) []*domain.Conversation {
 	cui := make([]string, len(convos))
 	for i, convo := range convos {
 		cui[i] = convo.UserID
@@ -109,7 +108,7 @@ func (c *Client) populateConvosAndWriteToChan(convos []*domain.Conversation) {
 		}
 		return b.LatestMsgSentAt.Compare(*a.LatestMsgSentAt)
 	})
-	c.Conversations.Write(convos)
+	return convos
 }
 
 func (c *Client) CreateConvoIfNotExist(convo *domain.Conversation) error {
@@ -121,4 +120,11 @@ func (c *Client) CreateConvoIfNotExist(convo *domain.Conversation) error {
 		return err
 	}
 	return nil
+}
+
+func (c *Client) saveConvosAndWriteToChan(convos []*domain.Conversation) {
+	c.populateConvosWithLatestMsgs(convos)
+	c.Conversations.Write(convos)
+	_ = c.repo.DeleteAllConversations()
+	_ = c.repo.SaveConversations(convos...) // ignore the error
 }

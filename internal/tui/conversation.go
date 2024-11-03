@@ -176,7 +176,11 @@ func (m ConversationModel) Update(msg tea.Msg) (ConversationModel, tea.Cmd) {
 		m.selDiscUserConvo = convo
 		selUserID = msg.id
 		selUsername = msg.name
-		cmd := m.conversationList.InsertItem(0, populateConvoItem(-1, convo))
+		renderState := false
+		if m.client.WsConnState.Get() == client.Connected {
+			renderState = true
+		}
+		cmd := m.conversationList.InsertItem(0, populateConvoItem(0, convo, renderState))
 		return m, cmd
 
 	case UsrOnlineMsg:
@@ -257,7 +261,7 @@ func getConversationListKeyMap(enabled bool) list.KeyMap {
 	return km
 }
 
-func populateConvoItem(i int, convo *domain.Conversation) conversationItem {
+func populateConvoItem(i int, convo *domain.Conversation, renderState bool) conversationItem {
 	id := "item_" + strconv.Itoa(i)
 	var latestMsg string
 	if convo.LatestMsg != nil {
@@ -265,7 +269,10 @@ func populateConvoItem(i int, convo *domain.Conversation) conversationItem {
 	} else {
 		latestMsg = "..."
 	}
-	s := renderStateInfo(convo)
+	var s string
+	if renderState {
+		s = renderStateInfo(convo)
+	}
 	item := conversationItem{id, convo.UserID, convo.Username, s, latestMsg}
 	return item
 }
@@ -309,12 +316,16 @@ func (m ConversationModel) getConversations() tea.Cmd {
 		default:
 		}
 		for i, convo := range convos {
+			renderState := false
+			if m.client.WsConnState.Get() == client.Connected {
+				renderState = true
+			}
 			if i == 0 { // add it to first idx
 				if m.selDiscUserConvo != nil && !containsSelConvo(convos, m.selDiscUserConvo.UserID) {
-					c = append(c, populateConvoItem(-1, m.selDiscUserConvo))
+					c = append(c, populateConvoItem(-1, m.selDiscUserConvo, renderState))
 				}
 			}
-			item := populateConvoItem(i, convo)
+			item := populateConvoItem(i, convo, renderState)
 			c = append(c, item)
 		}
 		return c

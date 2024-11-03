@@ -37,7 +37,10 @@ func (c *Client) SendMessage(msg domain.Message) {
 		}
 		// before returning write the conversations with updated last msgs to chan, tui.ConversationModel will pick it
 		convos, _ := c.repo.GetConversations()
-		c.populateConvosAndWriteToChan(convos)
+		c.populateConvosWithLatestMsgs(convos)
+		_ = c.repo.DeleteAllConversations()
+		_ = c.repo.SaveConversations(convos...)
+		c.Conversations.Write(convos)
 	}
 	// if sent save with sentAt field
 	// and write it back to chan with sent state, so tui can update accordingly
@@ -48,7 +51,10 @@ func (c *Client) SendMessage(msg domain.Message) {
 	msg.Operation = math.MinInt8 // so we don't have a redundant operation somewhere
 	c.RecvMsgs.Write(&msg)
 	convos, _ := c.repo.GetConversations()
-	c.populateConvosAndWriteToChan(convos)
+	c.populateConvosWithLatestMsgs(convos)
+	_ = c.repo.DeleteAllConversations()
+	_ = c.repo.SaveConversations(convos...)
+	c.Conversations.Write(convos)
 }
 
 func (c *Client) GetMessagesAsPageAndMarkAsRead(senderID string, page int) ([]*domain.Message, *domain.Metadata, error) {
@@ -92,6 +98,7 @@ func (c *Client) handleReceivedMsgs(shtdwnCtx context.Context) {
 				if err = c.setMsgAsDelivered(msg.ID, msg.SenderID); err != nil {
 					slog.Error(err.Error())
 				}
+				c.getPopulateSaveConvosAndWriteToChan()
 
 			case domain.UpdateMsg:
 				msgToUpdate, err := c.repo.GetMsgByID(msg.ID)
@@ -112,16 +119,16 @@ func (c *Client) handleReceivedMsgs(shtdwnCtx context.Context) {
 
 			case domain.DeleteMsg:
 				_ = c.repo.DeleteMsg(msg.ID)
+				c.getPopulateSaveConvosAndWriteToChan()
 
 			case domain.UserOnlineMsg:
 				c.setUsrOnlineStatus(msg, true)
+				//c.getPopulateSaveConvosAndWriteToChan()
 
 			case domain.UserOfflineMsg:
 				c.setUsrOnlineStatus(msg, false)
+				//c.getPopulateSaveConvosAndWriteToChan()
 			}
-			// once there is a message we also update the conversations as the latest msg will also need update
-			convos := c.Conversations.Get()
-			c.populateConvosAndWriteToChan(convos)
 
 		case <-shtdwnCtx.Done():
 			return
@@ -190,7 +197,7 @@ func (c *Client) setMsgAsDelivered(msgID, receiverID string) error {
 func (c *Client) setUsrOnlineStatus(msg *domain.Message, online bool) {
 	convos := c.Conversations.Get()
 	lastOnline := msg.SentAt
-	if !online {
+	if online {
 		lastOnline = nil
 	}
 	for i := range convos {
@@ -209,4 +216,13 @@ func ptr[T any](v T) *T {
 
 func (c *Client) isValidReadUpdate(msg *domain.Message) bool {
 	return msg.SenderID != c.CurrentUsr.ID && msg.DeliveredAt != nil && msg.Confirmation != domain.MsgReadConfirmed
+}
+
+// once there is a message we also update the conversations as the latest msg will also need update and save to db
+func (c *Client) getPopulateSaveConvosAndWriteToChan() {
+	convos := c.Conversations.Get()
+	c.populateConvosWithLatestMsgs(convos)
+	_ = c.repo.DeleteAllConversations()
+	_ = c.repo.SaveConversations(convos...)
+	c.Conversations.Write(convos)
 }

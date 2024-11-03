@@ -13,6 +13,7 @@ func (s *Server) RegisterUserHandler(w http.ResponseWriter, r *http.Request) {
 		s.badRequestResponse(w, r, err)
 		return
 	}
+
 	if err := s.Facade.RegisterUser(r.Context(), &userRegister); err != nil {
 		var ev *domain.ErrValidation
 		switch {

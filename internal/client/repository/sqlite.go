@@ -39,7 +39,8 @@ const ( // Local Database tables for client side application
 		CREATE TABLE IF NOT EXISTS conversation (
             user_id TEXT NOT NULL,
             username TEXT NOT NULL,
-            user_email TEXT NOT NULL
+            user_email TEXT NOT NULL,
+            last_online DATETIME
 		);
 	`
 )

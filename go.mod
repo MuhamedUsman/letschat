@@ -1,6 +1,6 @@
 module github.com/M0hammadUsman/letschat
 
-go 1.23.0
+go 1.23.2
 
 require (
 	github.com/99designs/keyring v1.2.2
