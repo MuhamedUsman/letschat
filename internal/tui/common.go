@@ -4,6 +4,7 @@ import (
 	"errors"
 	"github.com/M0hammadUsman/letschat/internal/domain"
 	tea "github.com/charmbracelet/bubbletea"
+	"time"
 )
 
 var (
@@ -44,3 +45,13 @@ type SentMsg *domain.Message
 type UsrOnlineMsg *domain.Message
 
 type UsrOfflineMsg *domain.Message
+
+type echoTypingMsg struct{}
+
+func echoTypingCmd() tea.Cmd {
+	return func() tea.Msg {
+		t := time.NewTimer(2 * time.Second)
+		<-t.C
+		return echoTypingMsg{}
+	}
+}

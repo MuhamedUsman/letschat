@@ -59,6 +59,9 @@ func (c *Client) SendMessage(msg domain.Message) {
 
 func (c *Client) SendTypingStatus(msg domain.Message) {
 	c.sentMsgs.msgs <- &msg
+	if !<-c.sentMsgs.done {
+		slog.Error(ErrMsgNotSent.Error())
+	}
 }
 
 func (c *Client) GetMessagesAsPageAndMarkAsRead(senderID string, page int) ([]*domain.Message, *domain.Metadata, error) {

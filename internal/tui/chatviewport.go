@@ -25,16 +25,17 @@ type msgBroadcast struct {
 }
 
 type ChatViewportModel struct {
-	vp                 viewport.Model
-	msgs               []*domain.Message
-	currPage, lastPage int
-	selUsrID           string
-	focus              bool
-	fetching           bool
-	prevLineCount      int
-	recvTypingTimer    timer.Model
-	client             *client.Client
-	mb                 msgBroadcast
+	vp                        viewport.Model
+	msgs                      []*domain.Message
+	currPage, lastPage        int
+	selUsrID                  string
+	focus                     bool
+	fetching                  bool
+	recvTypingTimer           timer.Model
+	lastTypingStateReceivedAt time.Time
+	prevLineCount             int
+	client                    *client.Client
+	mb                        msgBroadcast
 }
 
 func InitialChatViewport(c *client.Client) ChatViewportModel {
@@ -42,8 +43,8 @@ func InitialChatViewport(c *client.Client) ChatViewportModel {
 	return ChatViewportModel{
 		vp:              viewport.New(0, 0),
 		msgs:            make([]*domain.Message, 0),
-		recvTypingTimer: timer.New(5 * time.Second),
 		client:          c,
+		recvTypingTimer: timer.New(2 * time.Second),
 		mb: msgBroadcast{
 			ch:    ch,
 			token: token,
@@ -97,6 +98,7 @@ func (m ChatViewportModel) Update(msg tea.Msg) (ChatViewportModel, tea.Cmd) {
 		return m, m.handleChatViewportUpdate(msg)
 
 	case *domain.Message:
+		var cmd tea.Cmd
 		switch msg.Operation {
 		case domain.CreateMsg:
 			m.msgs = append([]*domain.Message{msg}, m.msgs...)
@@ -114,9 +116,6 @@ func (m ChatViewportModel) Update(msg tea.Msg) (ChatViewportModel, tea.Cmd) {
 			m.vp.SetContent(m.renderChatViewport())
 		case domain.UserTypingMsg:
 			selUserTyping = true
-			if m.recvTypingTimer.Timedout() {
-				m.recvTypingTimer.Timeout = 5 * time.Second
-			}
 		default:
 		}
 
@@ -132,7 +131,7 @@ func (m ChatViewportModel) Update(msg tea.Msg) (ChatViewportModel, tea.Cmd) {
 		default:
 		}
 
-		return m, tea.Batch(m.handleChatViewportUpdate(msg), m.listenForMessages())
+		return m, tea.Batch(m.handleChatViewportUpdate(msg), m.listenForMessages(), cmd)
 
 	case SentMsg: // the message we'll send gets here once delivered successfully
 		m.msgs = append([]*domain.Message{msg}, m.msgs...)
@@ -144,12 +143,13 @@ func (m ChatViewportModel) Update(msg tea.Msg) (ChatViewportModel, tea.Cmd) {
 		if m.recvTypingTimer.ID() == msg.ID {
 			var cmd tea.Cmd
 			m.recvTypingTimer, cmd = m.recvTypingTimer.Update(msg)
-			return m, tea.Batch(m.handleChatViewportUpdate(msg), cmd)
+			return m, cmd
 		}
 
 	case timer.TimeoutMsg:
 		if m.recvTypingTimer.ID() == msg.ID {
 			selUserTyping = false
+			m.recvTypingTimer.Timeout = 3 * time.Second
 		}
 
 	}

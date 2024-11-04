@@ -4,7 +4,6 @@ import (
 	"github.com/M0hammadUsman/letschat/internal/client"
 	"github.com/M0hammadUsman/letschat/internal/domain"
 	"github.com/charmbracelet/bubbles/textarea"
-	"github.com/charmbracelet/bubbles/timer"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/google/uuid"
@@ -20,26 +19,24 @@ const (
 )
 
 type ChatModel struct {
-	chatTxtarea     textarea.Model
-	chatViewport    ChatViewportModel
-	focus           bool
-	prevChatLength  int
-	sentTypingTimer timer.Model
-	client          *client.Client
-	cb              convosBroadcast
+	chatTxtarea    textarea.Model
+	chatViewport   ChatViewportModel
+	focus          bool
+	prevChatLength int
+	client         *client.Client
+	cb             convosBroadcast
 }
 
 func InitialChatModel(c *client.Client) ChatModel {
 	return ChatModel{
-		chatTxtarea:     newChatTxtArea(),
-		chatViewport:    InitialChatViewport(c),
-		sentTypingTimer: timer.New(3 * time.Second),
-		client:          c,
+		chatTxtarea:  newChatTxtArea(),
+		chatViewport: InitialChatViewport(c),
+		client:       c,
 	}
 }
 
 func (m ChatModel) Init() tea.Cmd {
-	return tea.Batch(textarea.Blink, m.chatViewport.Init(), m.sentTypingTimer.Init())
+	return tea.Batch(textarea.Blink, m.chatViewport.Init(), echoTypingCmd()) // not using timer -> it have bugs
 }
 
 func (m ChatModel) Update(msg tea.Msg) (ChatModel, tea.Cmd) {
@@ -54,22 +51,6 @@ func (m ChatModel) Update(msg tea.Msg) (ChatModel, tea.Cmd) {
 	}
 
 	switch msg := msg.(type) {
-
-	case timer.TickMsg:
-		if m.sentTypingTimer.ID() == msg.ID {
-			var cmd tea.Cmd
-			m.sentTypingTimer, cmd = m.sentTypingTimer.Update(msg)
-			return m, tea.Batch(m.handleChatTextareaUpdate(msg), m.handleChatViewportUpdate(msg), cmd)
-		}
-
-	case timer.TimeoutMsg:
-		m.sentTypingTimer.Timeout = 3 * time.Second
-		var cmd tea.Cmd
-		if m.sentTypingTimer.ID() == msg.ID && m.prevChatLength < m.chatTxtarea.Length() {
-			m.prevChatLength = m.chatTxtarea.Length()
-			cmd = m.sendTypingStatus()
-		}
-		return m, tea.Batch(m.handleChatTextareaUpdate(msg), m.handleChatViewportUpdate(msg), cmd)
 
 	case tea.WindowSizeMsg:
 		m.updateChatTxtareaAndViewportDimensions()
@@ -124,6 +105,15 @@ func (m ChatModel) Update(msg tea.Msg) (ChatModel, tea.Cmd) {
 			m.chatTxtarea.Blur()
 			m.updateChatTxtareaAndViewportDimensions()
 		}
+
+	case echoTypingMsg:
+		var cmd tea.Cmd
+		if m.prevChatLength < m.chatTxtarea.Length() && !selUserTyping {
+			m.prevChatLength = m.chatTxtarea.Length()
+			cmd = m.sendTypingStatus()
+		}
+		// echo again to continue the cycle
+		return m, tea.Batch(cmd, echoTypingCmd())
 
 	}
 	return m, tea.Batch(m.handleChatTextareaUpdate(msg), m.handleChatViewportUpdate(msg))
@@ -234,16 +224,16 @@ func (m *ChatModel) sendMessage(msg string) tea.Cmd {
 }
 
 func (m *ChatModel) sendTypingStatus() tea.Cmd {
+	t := time.Now()
+	msgToSnd := domain.Message{
+		ID:           uuid.New().String(),
+		SenderID:     m.client.CurrentUsr.ID,
+		ReceiverID:   selUserID,
+		SentAt:       &t,
+		Operation:    domain.UserTypingMsg,
+		Confirmation: 0,
+	}
 	return func() tea.Msg {
-		t := time.Now()
-		msgToSnd := domain.Message{
-			ID:           uuid.New().String(),
-			SenderID:     m.client.CurrentUsr.ID,
-			ReceiverID:   selUserID,
-			SentAt:       &t,
-			Operation:    domain.UserTypingMsg,
-			Confirmation: 0,
-		}
 		m.client.SendTypingStatus(msgToSnd)
 		return nil
 	}
