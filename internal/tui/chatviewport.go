@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/M0hammadUsman/letschat/internal/client"
 	"github.com/M0hammadUsman/letschat/internal/domain"
+	"github.com/charmbracelet/bubbles/timer"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -31,6 +32,7 @@ type ChatViewportModel struct {
 	focus              bool
 	fetching           bool
 	prevLineCount      int
+	recvTypingTimer    timer.Model
 	client             *client.Client
 	mb                 msgBroadcast
 }
@@ -38,9 +40,10 @@ type ChatViewportModel struct {
 func InitialChatViewport(c *client.Client) ChatViewportModel {
 	token, ch := c.RecvMsgs.Subscribe()
 	return ChatViewportModel{
-		vp:     viewport.New(0, 0),
-		msgs:   make([]*domain.Message, 0),
-		client: c,
+		vp:              viewport.New(0, 0),
+		msgs:            make([]*domain.Message, 0),
+		recvTypingTimer: timer.New(5 * time.Second),
+		client:          c,
 		mb: msgBroadcast{
 			ch:    ch,
 			token: token,
@@ -50,7 +53,7 @@ func InitialChatViewport(c *client.Client) ChatViewportModel {
 
 func (m ChatViewportModel) Init() tea.Cmd {
 	m.fetching = true
-	return m.listenForMessages()
+	return tea.Batch(m.listenForMessages(), m.recvTypingTimer.Init())
 }
 
 func (m ChatViewportModel) Update(msg tea.Msg) (ChatViewportModel, tea.Cmd) {
@@ -75,9 +78,11 @@ func (m ChatViewportModel) Update(msg tea.Msg) (ChatViewportModel, tea.Cmd) {
 		}
 	}
 	switch msg := msg.(type) {
+
 	case tea.WindowSizeMsg:
 		m.vp.SetContent(m.renderChatViewport())
 		return m, m.handleChatViewportUpdate(msg)
+
 	case msgPage:
 		m.fetching = false
 		m.msgs = append(m.msgs, msg.msgs...)
@@ -90,6 +95,7 @@ func (m ChatViewportModel) Update(msg tea.Msg) (ChatViewportModel, tea.Cmd) {
 		// Now update the prev line count
 		m.prevLineCount = m.vp.TotalLineCount()
 		return m, m.handleChatViewportUpdate(msg)
+
 	case *domain.Message:
 		switch msg.Operation {
 		case domain.CreateMsg:
@@ -106,12 +112,11 @@ func (m ChatViewportModel) Update(msg tea.Msg) (ChatViewportModel, tea.Cmd) {
 			m.updateMsgInMsgs(msg)
 			// the above op will update the msgs so we need to rerender
 			m.vp.SetContent(m.renderChatViewport())
-		/*case domain.UserOnlineMsg:
-			// throw this msg out, and pick it in tui.ConversationModel
-			return m, func() tea.Msg { return UsrOnlineMsg(msg) }
-		case domain.UserOfflineMsg:
-			// throw this msg out, and pick it in tui.ConversationModel
-			return m, func() tea.Msg { return UsrOfflineMsg(msg) }*/
+		case domain.UserTypingMsg:
+			selUserTyping = true
+			if m.recvTypingTimer.Timedout() {
+				m.recvTypingTimer.Timeout = 5 * time.Second
+			}
 		default:
 		}
 
@@ -126,15 +131,30 @@ func (m ChatViewportModel) Update(msg tea.Msg) (ChatViewportModel, tea.Cmd) {
 			}
 		default:
 		}
-		return m, tea.Batch(m.listenForMessages(), m.handleChatViewportUpdate(msg))
+
+		return m, tea.Batch(m.handleChatViewportUpdate(msg), m.listenForMessages())
 
 	case SentMsg: // the message we'll send gets here once delivered successfully
 		m.msgs = append([]*domain.Message{msg}, m.msgs...)
 		m.vp.SetContent(m.renderChatViewport())
 		m.vp.LineDown(3) // GotoBottom does not work here as intended
 		return m, m.handleChatViewportUpdate(msg)
+
+	case timer.TickMsg:
+		if m.recvTypingTimer.ID() == msg.ID {
+			var cmd tea.Cmd
+			m.recvTypingTimer, cmd = m.recvTypingTimer.Update(msg)
+			return m, tea.Batch(m.handleChatViewportUpdate(msg), cmd)
+		}
+
+	case timer.TimeoutMsg:
+		if m.recvTypingTimer.ID() == msg.ID {
+			selUserTyping = false
+		}
+
 	}
-	return m, m.handleChatViewportUpdate(msg)
+
+	return m, tea.Batch(m.handleChatViewportUpdate(msg))
 }
 
 func (m ChatViewportModel) View() string {

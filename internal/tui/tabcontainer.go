@@ -144,10 +144,14 @@ func (m TabContainerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case timer.TickMsg:
-		return m, m.handleTimerUpdate(msg)
+		if m.timer.ID() == msg.ID {
+			return m, m.handleTimerUpdate(msg)
+		}
 
 	case timer.TimeoutMsg:
-		m.errMsg = nil
+		if m.timer.ID() == msg.ID {
+			m.errMsg = nil
+		}
 
 	case spinMsg:
 		return m, m.spinner.Tick

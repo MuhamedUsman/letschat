@@ -15,6 +15,7 @@ const (
 	DeleteMsg
 	UserOnlineMsg
 	UserOfflineMsg
+	UserTypingMsg
 )
 
 // Confirmation only be used on frontend side

@@ -2,7 +2,7 @@ package service
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"github.com/M0hammadUsman/letschat/internal/api/utility"
 	"github.com/M0hammadUsman/letschat/internal/domain"
 	"github.com/google/uuid"
@@ -58,8 +58,10 @@ func (s *MessageService) ProcessSentMessages(ctx context.Context, m *domain.Mess
 		return nil
 	case domain.UserOfflineMsg:
 		return nil
+	case domain.UserTypingMsg:
+		return nil
 	default:
-		return errors.New("invalid message operation")
+		return fmt.Errorf("unknown operation %v", m.Operation)
 	}
 }
 

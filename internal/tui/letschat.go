@@ -13,7 +13,9 @@ const (
 )
 
 var (
-	selUserID, selUsername string // selected user from conversations
+	// selected user from conversations, global for performance reasons
+	selUserID, selUsername string
+	selUserTyping          bool
 )
 
 type LetschatModel struct {
@@ -78,15 +80,3 @@ func (m *LetschatModel) handleChatUpdate(msg tea.Msg) tea.Cmd {
 	m.chat, cmd = m.chat.Update(msg)
 	return cmd
 }
-
-// Helpers & Stuff -----------------------------------------------------------------------------------------------------
-
-/*func (m *LetschatModel) handleMessage() tea.Cmd {
-	return func() tea.Msg {
-		msg := m.client.RecvMsgs.WaitForStateChange()
-		switch msg.Operation {
-		case domain.CreateMsg:
-
-		}
-	}
-}*/

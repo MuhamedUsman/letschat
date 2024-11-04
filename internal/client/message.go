@@ -57,6 +57,10 @@ func (c *Client) SendMessage(msg domain.Message) {
 	c.Conversations.Write(convos)
 }
 
+func (c *Client) SendTypingStatus(msg domain.Message) {
+	c.sentMsgs.msgs <- &msg
+}
+
 func (c *Client) GetMessagesAsPageAndMarkAsRead(senderID string, page int) ([]*domain.Message, *domain.Metadata, error) {
 	f := domain.Filter{
 		Page:     page,
