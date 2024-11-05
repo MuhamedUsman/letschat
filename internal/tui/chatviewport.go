@@ -2,12 +2,14 @@ package tui
 
 import (
 	"context"
+	"fmt"
 	"github.com/M0hammadUsman/letschat/internal/client"
 	"github.com/M0hammadUsman/letschat/internal/domain"
 	"github.com/charmbracelet/bubbles/timer"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	zone "github.com/lrstanley/bubblezone"
 	"log/slog"
 	"slices"
 	"strings"
@@ -83,6 +85,19 @@ func (m ChatViewportModel) Update(msg tea.Msg) (ChatViewportModel, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.vp.SetContent(m.renderChatViewport())
 		return m, m.handleChatViewportUpdate(msg)
+
+	case tea.MouseMsg:
+		if msg.Button == tea.MouseButtonRight && msg.Action == tea.MouseActionRelease {
+			for _, mesg := range m.msgs {
+				a := zone.Get(mesg.ID)
+				if a != nil {
+					slog.Info(fmt.Sprintf("%+v", a))
+				}
+				if zone.Get(mesg.ID).InBounds(msg) {
+					return m, tea.Quit
+				}
+			}
+		}
 
 	case msgPage:
 		m.fetching = false
@@ -191,10 +206,10 @@ func (m *ChatViewportModel) renderChatViewport() string {
 		if msg.SenderID == m.client.CurrentUsr.ID {
 			align = lipgloss.Right
 		}
+		// chat bubble
 		cb := cb.
 			Align(align).
 			Render(m.renderBubbleWithStatusInfo(msg))
-		// TODO: Add functionality to show time and stuff
 		sb.WriteString("\n")
 		sb.WriteString(cb)
 	}
@@ -220,6 +235,8 @@ func (m *ChatViewportModel) renderBubbleWithStatusInfo(msg *domain.Message) stri
 
 	if msg.SenderID == m.client.CurrentUsr.ID {
 		bubble = chatBubbleRStyle.Width(txtWidth).Render(msg.Body)
+		// mark the msg with zone on the right side so we can pick these up using mouse clicks
+		bubble = zone.Mark(msg.ID, bubble)
 		sentAt = sentAt.Foreground(primaryColor)
 		return lipgloss.JoinHorizontal(lipgloss.Center, status, " ", sentAt.Render(), " ", bubble)
 	}
