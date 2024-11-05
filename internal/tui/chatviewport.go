@@ -2,7 +2,6 @@ package tui
 
 import (
 	"context"
-	"fmt"
 	"github.com/M0hammadUsman/letschat/internal/client"
 	"github.com/M0hammadUsman/letschat/internal/domain"
 	"github.com/charmbracelet/bubbles/timer"
@@ -89,10 +88,6 @@ func (m ChatViewportModel) Update(msg tea.Msg) (ChatViewportModel, tea.Cmd) {
 	case tea.MouseMsg:
 		if msg.Button == tea.MouseButtonRight && msg.Action == tea.MouseActionRelease {
 			for _, mesg := range m.msgs {
-				a := zone.Get(mesg.ID)
-				if a != nil {
-					slog.Info(fmt.Sprintf("%+v", a))
-				}
 				if zone.Get(mesg.ID).InBounds(msg) {
 					return m, tea.Quit
 				}
