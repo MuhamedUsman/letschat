@@ -18,9 +18,10 @@ import (
 )
 
 const (
-	infoDialogBox       = "infoDialogBox"
-	infoDialogCopyBtn   = "infoDialogCopyBtn"
-	infoDialogDeleteBtn = "infoDialogDeleteBtn"
+	infoDialogBox               = "infoDialogBox"
+	infoDialogCopyBtn           = "infoDialogCopyBtn"
+	infoDialogDelForMeBtn       = "infoDialogDelForMeBtn"
+	infoDialogDelForEveryoneBtn = "infoDialogDelForEveryoneBtn"
 )
 
 type msgPage struct {
@@ -119,27 +120,47 @@ func (m ChatViewportModel) Update(msg tea.Msg) (ChatViewportModel, tea.Cmd) {
 			m.selMsgId = nil
 			m.selMsgDialogBtn = -1
 		case "tab":
-			// selMsg is sent by sender, we will show copy and delete btn
 			if selMsg != nil {
-				switch m.selMsgDialogBtn {
-				case 0:
-					m.selMsgDialogBtn++
-				case 1:
-					m.selMsgDialogBtn--
+				if m.selMsgDialogBtn >= 0 && m.selMsgDialogBtn <= 2 {
+					if selMsg.SenderID == m.client.CurrentUsr.ID {
+						m.selMsgDialogBtn = (m.selMsgDialogBtn + 1) % 3
+					} else {
+						m.selMsgDialogBtn = (m.selMsgDialogBtn + 1) % 2
+					}
+				}
+				if m.selMsgDialogBtn > 2 {
+					m.selMsgDialogBtn = 0
 				}
 				m.msgDialogVp.SetContent(m.renderMsgDialogViewport())
 			}
 		case "left":
 			if selMsg != nil {
-				if m.selMsgDialogBtn == 1 {
-					m.selMsgDialogBtn--
+				if m.selMsgDialogBtn > 0 && m.selMsgDialogBtn <= 2 {
+					if selMsg.SenderID == m.client.CurrentUsr.ID {
+						m.selMsgDialogBtn--
+					} else {
+						m.selMsgDialogBtn--
+						if m.selMsgDialogBtn < 0 {
+							m.selMsgDialogBtn = 0
+						}
+					}
 				}
 				m.msgDialogVp.SetContent(m.renderMsgDialogViewport())
 			}
 		case "right":
 			if selMsg != nil {
-				if m.selMsgDialogBtn == 0 {
-					m.selMsgDialogBtn++
+				if m.selMsgDialogBtn >= 0 && m.selMsgDialogBtn <= 1 {
+					if selMsg.SenderID == m.client.CurrentUsr.ID {
+						m.selMsgDialogBtn++
+						if m.selMsgDialogBtn > 2 {
+							m.selMsgDialogBtn = 2
+						}
+					} else {
+						m.selMsgDialogBtn++
+						if m.selMsgDialogBtn > 1 {
+							m.selMsgDialogBtn = 1
+						}
+					}
 				}
 				m.msgDialogVp.SetContent(m.renderMsgDialogViewport())
 			}
@@ -169,8 +190,11 @@ func (m ChatViewportModel) Update(msg tea.Msg) (ChatViewportModel, tea.Cmd) {
 				if zone.Get(infoDialogCopyBtn).InBounds(msg) {
 					m.selMsgDialogBtn = 0
 				}
-				if zone.Get(infoDialogDeleteBtn).InBounds(msg) {
+				if zone.Get(infoDialogDelForMeBtn).InBounds(msg) {
 					m.selMsgDialogBtn = 1
+				}
+				if zone.Get(infoDialogDelForEveryoneBtn).InBounds(msg) {
+					m.selMsgDialogBtn = 2
 				}
 				m.msgDialogVp.SetContent(m.renderMsgDialogViewport())
 			} else if msg.Action == tea.MouseActionRelease {
@@ -331,9 +355,29 @@ func (m ChatViewportModel) renderMsgDialogViewport() string {
 	body = msgInfoBodyStyle.
 		Width(chatWidth() - msgInfoBodyStyle.GetHorizontalFrameSize()).
 		Render(infoMsg.Body)
+
 	copyBtn := zone.Mark(infoDialogCopyBtn, renderCopyBtn(m.selMsgDialogBtn))
-	delBtn := zone.Mark(infoDialogDeleteBtn, renderDeleteBtn(m.selMsgDialogBtn))
-	btnContainer = msgInfoContainerBtn.Render(copyBtn, delBtn)
+	delBtn := zone.Mark(infoDialogDelForMeBtn, renderDeleteBtn(false, "DELETE"))
+	delForMeFocus := false
+	delForEveryoneFocus := false
+	if m.selMsgDialogBtn == 1 {
+		delForMeFocus = true
+	}
+	if m.selMsgDialogBtn == 2 {
+		delForEveryoneFocus = true
+	}
+	delForMeBtn := zone.Mark(infoDialogDelForMeBtn, renderDeleteBtn(delForMeFocus, "DELETE FOR ME"))
+	delForEveryoneBtn := zone.Mark(infoDialogDelForEveryoneBtn, renderDeleteBtn(delForEveryoneFocus, "DELETE FOR EVERYONE"))
+
+	if m.selMsgDialogBtn == 0 {
+		btnContainer = msgInfoContainerBtn.Render(copyBtn, delBtn)
+	} else {
+		btnContainer = msgInfoContainerBtn.Render(copyBtn, delForMeBtn, delForEveryoneBtn)
+		if infoMsg.SenderID != m.client.CurrentUsr.ID {
+			btnContainer = msgInfoContainerBtn.Render(copyBtn, delForMeBtn)
+		}
+	}
+
 	status := renderInfoMsgStatus(infoMsg)
 	foot = msgInfoFooterStyle.Render(status)
 
@@ -375,17 +419,17 @@ func renderCopyBtn(selBtnIdx int) string {
 		Render("COPY")
 }
 
-func renderDeleteBtn(selBtnIdx int) string {
+func renderDeleteBtn(focus bool, btnTxt string) string {
 	bg := dangerColor
 	fg := whiteColor
-	if selBtnIdx != 1 {
+	if !focus {
 		bg = darkGreyColor
 		fg = lightGreyColor
 	}
 	return msgInfoBtnStyle.
 		Background(bg).
 		Foreground(fg).
-		Render("DELETE")
+		Render(btnTxt)
 }
 
 // getSelectedMsgFromMsgSlice
