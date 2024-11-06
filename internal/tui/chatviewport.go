@@ -2,8 +2,10 @@ package tui
 
 import (
 	"context"
+	"fmt"
 	"github.com/M0hammadUsman/letschat/internal/client"
 	"github.com/M0hammadUsman/letschat/internal/domain"
+	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/bubbles/timer"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
@@ -13,6 +15,12 @@ import (
 	"slices"
 	"strings"
 	"time"
+)
+
+const (
+	infoDialogBox       = "infoDialogBox"
+	infoDialogCopyBtn   = "infoDialogCopyBtn"
+	infoDialogDeleteBtn = "infoDialogDeleteBtn"
 )
 
 type msgPage struct {
@@ -26,10 +34,16 @@ type msgBroadcast struct {
 }
 
 type ChatViewportModel struct {
-	vp                        viewport.Model
-	msgs                      []*domain.Message
-	currPage, lastPage        int
-	selUsrID                  string
+	chatVp             viewport.Model
+	msgDialogVp        viewport.Model
+	msgs               []*domain.Message
+	currPage, lastPage int
+	selUsrID           string
+	// currently selected msg (sent one) for info, we'll hide the dialog once the selMsgId is nil
+	selMsgId *string
+	// current button selection once the msg info dialog in focus,
+	// 0 -> CopyBtn | 1 -> DeleteBtn
+	selMsgDialogBtn           int // -1 when the selMsgId is nil
 	focus                     bool
 	fetching                  bool
 	recvTypingTimer           timer.Model
@@ -42,7 +56,8 @@ type ChatViewportModel struct {
 func InitialChatViewport(c *client.Client) ChatViewportModel {
 	token, ch := c.RecvMsgs.Subscribe()
 	return ChatViewportModel{
-		vp:              viewport.New(0, 0),
+		chatVp: viewport.New(0, 0),
+		//msgDialogVp:     viewport.New(0, 0),
 		msgs:            make([]*domain.Message, 0),
 		client:          c,
 		recvTypingTimer: timer.New(2 * time.Second),
@@ -60,11 +75,19 @@ func (m ChatViewportModel) Init() tea.Cmd {
 
 func (m ChatViewportModel) Update(msg tea.Msg) (ChatViewportModel, tea.Cmd) {
 	if m.focus {
-		m.vp.KeyMap = viewport.DefaultKeyMap()
-		m.vp.MouseWheelEnabled = true
+		m.chatVp.KeyMap = viewport.DefaultKeyMap()
+		m.msgDialogVp.KeyMap = viewport.DefaultKeyMap()
+		m.chatVp.MouseWheelEnabled = true
+		m.msgDialogVp.MouseWheelEnabled = false
+		if m.selMsgId != nil {
+			m.msgDialogVp.MouseWheelEnabled = true
+			m.chatVp.MouseWheelEnabled = false
+		}
 	} else {
-		m.vp.KeyMap = viewport.KeyMap{}
-		m.vp.MouseWheelEnabled = false
+		m.chatVp.KeyMap = viewport.KeyMap{}
+		m.msgDialogVp.KeyMap = viewport.KeyMap{}
+		m.chatVp.MouseWheelEnabled = false
+		m.msgDialogVp.MouseWheelEnabled = false
 	}
 
 	if m.selUsrID != selUserID {
@@ -73,7 +96,7 @@ func (m ChatViewportModel) Update(msg tea.Msg) (ChatViewportModel, tea.Cmd) {
 		m.selUsrID = selUserID
 		return m, m.getMsgAsPage(1)
 	}
-	if m.vp.AtTop() && !m.fetching {
+	if m.chatVp.AtTop() && !m.fetching {
 		if m.lastPage != m.currPage {
 			m.fetching = true
 			return m, m.getMsgAsPage(m.currPage + 1)
@@ -82,15 +105,87 @@ func (m ChatViewportModel) Update(msg tea.Msg) (ChatViewportModel, tea.Cmd) {
 	switch msg := msg.(type) {
 
 	case tea.WindowSizeMsg:
-		m.vp.SetContent(m.renderChatViewport())
-		return m, m.handleChatViewportUpdate(msg)
+		m.chatVp.SetContent(m.renderChatViewport())
+		return m, tea.Batch(m.handleChatViewportUpdate(msg), m.handleMsgDialogViewportUpdate(msg))
+
+	case tea.KeyMsg:
+		var selMsg *domain.Message
+		if m.selMsgId != nil {
+			selMsg = m.getSelMsgFromMsgSlice()
+		}
+
+		switch msg.String() {
+		case "esc", "ctrl+t", "ctrl+f": // once user types or filters convos, hide the dialog
+			m.selMsgId = nil
+			m.selMsgDialogBtn = -1
+		case "tab":
+			// selMsg is sent by sender, we will show copy and delete btn
+			if selMsg != nil {
+				switch m.selMsgDialogBtn {
+				case 0:
+					m.selMsgDialogBtn++
+				case 1:
+					m.selMsgDialogBtn--
+				}
+				m.msgDialogVp.SetContent(m.renderMsgDialogViewport())
+			}
+		case "left":
+			if selMsg != nil {
+				if m.selMsgDialogBtn == 1 {
+					m.selMsgDialogBtn--
+				}
+				m.msgDialogVp.SetContent(m.renderMsgDialogViewport())
+			}
+		case "right":
+			if selMsg != nil {
+				if m.selMsgDialogBtn == 0 {
+					m.selMsgDialogBtn++
+				}
+				m.msgDialogVp.SetContent(m.renderMsgDialogViewport())
+			}
+		case "enter":
+			if m.selMsgId != nil {
+				if m.selMsgDialogBtn == 0 {
+					_ = clipboard.WriteAll(m.getSelMsgFromMsgSlice().Body)
+				}
+			}
+		}
 
 	case tea.MouseMsg:
 		if msg.Button == tea.MouseButtonRight && msg.Action == tea.MouseActionRelease {
 			for _, mesg := range m.msgs {
 				if zone.Get(mesg.ID).InBounds(msg) {
-					return m, tea.Quit
+					m.selMsgId = &mesg.ID
+					m.selMsgDialogBtn = 0
+					m.msgDialogVp.SetContent(m.renderMsgDialogViewport())
+					break
 				}
+			}
+			return m, nil
+		}
+
+		if m.selMsgId != nil && msg.Button == tea.MouseButtonLeft {
+			if msg.Action == tea.MouseActionPress {
+				if zone.Get(infoDialogCopyBtn).InBounds(msg) {
+					m.selMsgDialogBtn = 0
+				}
+				if zone.Get(infoDialogDeleteBtn).InBounds(msg) {
+					m.selMsgDialogBtn = 1
+				}
+				m.msgDialogVp.SetContent(m.renderMsgDialogViewport())
+			} else if msg.Action == tea.MouseActionRelease {
+				if m.selMsgId != nil {
+					if m.selMsgDialogBtn == 0 {
+						_ = clipboard.WriteAll(m.getSelMsgFromMsgSlice().Body)
+					}
+				}
+			}
+		}
+
+		if msg.Action == tea.MouseActionMotion {
+			if !zone.Get(infoDialogBox).InBounds(msg) {
+				m.selMsgId = nil
+				m.selMsgDialogBtn = -1
 			}
 		}
 
@@ -99,12 +194,12 @@ func (m ChatViewportModel) Update(msg tea.Msg) (ChatViewportModel, tea.Cmd) {
 		m.msgs = append(m.msgs, msg.msgs...)
 		m.currPage = msg.meta.CurrentPage
 		m.lastPage = msg.meta.LastPage
-		m.vp.SetContent(m.renderChatViewport())
+		m.chatVp.SetContent(m.renderChatViewport())
 		// Once we set the content it takes us to the top, we want to go to the point where the user were before
-		c := m.vp.TotalLineCount() - m.prevLineCount
-		m.vp.LineDown(c)
+		c := m.chatVp.TotalLineCount() - m.prevLineCount
+		m.chatVp.LineDown(c)
 		// Now update the prev line count
-		m.prevLineCount = m.vp.TotalLineCount()
+		m.prevLineCount = m.chatVp.TotalLineCount()
 		return m, m.handleChatViewportUpdate(msg)
 
 	case *domain.Message:
@@ -112,8 +207,8 @@ func (m ChatViewportModel) Update(msg tea.Msg) (ChatViewportModel, tea.Cmd) {
 		switch msg.Operation {
 		case domain.CreateMsg:
 			m.msgs = append([]*domain.Message{msg}, m.msgs...)
-			m.vp.SetContent(m.renderChatViewport())
-			m.vp.GotoBottom()
+			m.chatVp.SetContent(m.renderChatViewport())
+			m.chatVp.GotoBottom()
 			// set it as read also | nil check, if the terminal focus is not supported, just set the msg as read
 			if msg.SenderID == selUserID && msg.ReadAt == nil && (terminalFocus == nil || *terminalFocus) {
 				t := time.Now()
@@ -123,7 +218,12 @@ func (m ChatViewportModel) Update(msg tea.Msg) (ChatViewportModel, tea.Cmd) {
 		case domain.UpdateMsg:
 			m.updateMsgInMsgs(msg)
 			// the above op will update the msgs so we need to rerender
-			m.vp.SetContent(m.renderChatViewport())
+			if m.selMsgId != nil {
+				m.chatVp.SetContent(m.renderMsgDialogViewport())
+			} else {
+				m.chatVp.SetContent(m.renderChatViewport())
+			}
+
 		case domain.UserTypingMsg:
 			selUserTyping = true
 		default:
@@ -134,19 +234,19 @@ func (m ChatViewportModel) Update(msg tea.Msg) (ChatViewportModel, tea.Cmd) {
 			for i, ms := range m.msgs {
 				if ms.ID == msg.ID {
 					m.msgs[i] = msg
-					m.vp.SetContent(m.renderChatViewport())
+					m.chatVp.SetContent(m.renderChatViewport())
 					break
 				}
 			}
 		default:
 		}
 
-		return m, tea.Batch(m.handleChatViewportUpdate(msg), m.listenForMessages(), cmd)
+		return m, tea.Batch(m.handleChatViewportUpdate(msg), m.handleMsgDialogViewportUpdate(msg), m.listenForMessages(), cmd)
 
 	case SentMsg: // the message we'll send gets here once delivered successfully
 		m.msgs = append([]*domain.Message{msg}, m.msgs...)
-		m.vp.SetContent(m.renderChatViewport())
-		m.vp.LineDown(3) // GotoBottom does not work here as intended
+		m.chatVp.SetContent(m.renderChatViewport())
+		m.chatVp.LineDown(3) // GotoBottom does not work here as intended
 		return m, m.handleChatViewportUpdate(msg)
 
 	case timer.TickMsg:
@@ -164,11 +264,19 @@ func (m ChatViewportModel) Update(msg tea.Msg) (ChatViewportModel, tea.Cmd) {
 
 	}
 
-	return m, tea.Batch(m.handleChatViewportUpdate(msg))
+	return m, tea.Batch(m.handleChatViewportUpdate(msg), m.handleMsgDialogViewportUpdate(msg))
 }
 
 func (m ChatViewportModel) View() string {
-	return m.vp.View()
+	// show dialog box once a msg is selected for info details
+	if m.selMsgId != nil {
+		v := m.msgDialogVp.View()
+		// mark it so once out of its bounds we hide it
+		v = zone.Mark(infoDialogBox, v)
+		return v
+	} else {
+		return m.chatVp.View()
+	}
 }
 
 // Helpers & Stuff -----------------------------------------------------------------------------------------------------
@@ -211,6 +319,85 @@ func (m *ChatViewportModel) renderChatViewport() string {
 	return sb.String()
 }
 
+func (m ChatViewportModel) renderMsgDialogViewport() string {
+	// get the message
+	infoMsg := m.getSelMsgFromMsgSlice()
+	var head, body, btnContainer, foot string
+	headTxt := "YOU"
+	if infoMsg.SenderID == selUserID {
+		headTxt = selUsername
+	}
+	head = msgInfoHeaderStyle.Render(headTxt)
+	body = msgInfoBodyStyle.
+		Width(chatWidth() - msgInfoBodyStyle.GetHorizontalFrameSize()).
+		Render(infoMsg.Body)
+	copyBtn := zone.Mark(infoDialogCopyBtn, renderCopyBtn(m.selMsgDialogBtn))
+	delBtn := zone.Mark(infoDialogDeleteBtn, renderDeleteBtn(m.selMsgDialogBtn))
+	btnContainer = msgInfoContainerBtn.Render(copyBtn, delBtn)
+	status := renderInfoMsgStatus(infoMsg)
+	foot = msgInfoFooterStyle.Render(status)
+
+	return head + body + btnContainer + foot
+}
+
+func renderInfoMsgStatus(msg *domain.Message) string {
+	l, err := time.LoadLocation("Local")
+	if err != nil {
+		slog.Error(err.Error())
+	}
+	f := "02-Jan-2006 | 3:04 PM"
+	var sb strings.Builder
+	if msg.SentAt != nil {
+		sb.WriteString(fmt.Sprintf("✓     %v", msg.SentAt.In(l).Format(f)))
+		sb.WriteString("\n\n")
+	}
+	if msg.DeliveredAt != nil {
+		sb.WriteString(fmt.Sprintf("✓✓    %v", msg.DeliveredAt.In(l).Format(f)))
+		sb.WriteString("\n\n")
+	}
+	if msg.ReadAt != nil {
+		sb.WriteString(fmt.Sprintf("✓✓✓   %v", msg.ReadAt.In(l).Format(f)))
+	}
+	return sb.String()
+}
+
+func renderCopyBtn(selBtnIdx int) string {
+	bg := primaryColor
+	fg := primaryContrastColor
+	if selBtnIdx != 0 {
+		bg = darkGreyColor
+		fg = lightGreyColor
+	}
+	return msgInfoBtnStyle.
+		Background(bg).
+		Foreground(fg).
+		Padding(0, 3).
+		Render("COPY")
+}
+
+func renderDeleteBtn(selBtnIdx int) string {
+	bg := dangerColor
+	fg := whiteColor
+	if selBtnIdx != 1 {
+		bg = darkGreyColor
+		fg = lightGreyColor
+	}
+	return msgInfoBtnStyle.
+		Background(bg).
+		Foreground(fg).
+		Render("DELETE")
+}
+
+// getSelectedMsgFromMsgSlice
+func (m *ChatViewportModel) getSelMsgFromMsgSlice() *domain.Message {
+	for _, msg := range m.msgs {
+		if m.selMsgId != nil && msg.ID == *m.selMsgId {
+			return msg
+		}
+	}
+	return nil
+}
+
 func (m *ChatViewportModel) renderBubbleWithStatusInfo(msg *domain.Message) string {
 	txtWidth := min(chatWidth()-20, lipgloss.Width(msg.Body)+2)
 	bubble := chatBubbleLStyle.Width(txtWidth).Render(msg.Body)
@@ -235,17 +422,29 @@ func (m *ChatViewportModel) renderBubbleWithStatusInfo(msg *domain.Message) stri
 		sentAt = sentAt.Foreground(primaryColor)
 		return lipgloss.JoinHorizontal(lipgloss.Center, status, " ", sentAt.Render(), " ", bubble)
 	}
+	// mark the msg with zone on the left side so we can pick these up using mouse clicks
+	bubble = zone.Mark(msg.ID, bubble)
 	return lipgloss.JoinHorizontal(lipgloss.Center, bubble, " ", sentAt.Render())
 }
 
 func (m *ChatViewportModel) updateDimensions() {
-	m.vp.Width = chatWidth()
-	m.vp.Height = chatHeight() - (chatHeaderHeight + chatTextareaHeight)
+	w := chatWidth()
+	h := chatHeight() - (chatHeaderHeight + chatTextareaHeight)
+	m.chatVp.Width = w
+	m.msgDialogVp.Width = w
+	m.chatVp.Height = h
+	m.msgDialogVp.Height = h
 }
 
 func (m *ChatViewportModel) handleChatViewportUpdate(msg tea.Msg) tea.Cmd {
 	var cmd tea.Cmd
-	m.vp, cmd = m.vp.Update(msg)
+	m.chatVp, cmd = m.chatVp.Update(msg)
+	return cmd
+}
+
+func (m *ChatViewportModel) handleMsgDialogViewportUpdate(msg tea.Msg) tea.Cmd {
+	var cmd tea.Cmd
+	m.msgDialogVp, cmd = m.msgDialogVp.Update(msg)
 	return cmd
 }
 

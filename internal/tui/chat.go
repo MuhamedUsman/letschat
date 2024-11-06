@@ -50,6 +50,8 @@ func (m ChatModel) Update(msg tea.Msg) (ChatModel, tea.Cmd) {
 		m.chatViewport.focus = true
 	}
 
+	var typingCmd tea.Cmd
+
 	switch msg := msg.(type) {
 
 	case tea.WindowSizeMsg:
@@ -58,9 +60,8 @@ func (m ChatModel) Update(msg tea.Msg) (ChatModel, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+t":
-			cmd := m.chatTxtarea.Focus()
+			typingCmd = m.chatTxtarea.Focus()
 			m.updateChatTxtareaAndViewportDimensions()
-			return m, cmd
 		case "ctrl+s":
 			s := m.chatTxtarea.Value()
 			s = strings.TrimSpace(s)
@@ -72,7 +73,6 @@ func (m ChatModel) Update(msg tea.Msg) (ChatModel, tea.Cmd) {
 		case "esc":
 			m.chatTxtarea.Blur()
 			m.updateChatTxtareaAndViewportDimensions()
-			return m, nil
 		}
 
 	case tea.MouseMsg:
@@ -116,7 +116,7 @@ func (m ChatModel) Update(msg tea.Msg) (ChatModel, tea.Cmd) {
 		return m, tea.Batch(cmd, echoTypingCmd())
 
 	}
-	return m, tea.Batch(m.handleChatTextareaUpdate(msg), m.handleChatViewportUpdate(msg))
+	return m, tea.Batch(typingCmd, m.handleChatTextareaUpdate(msg), m.handleChatViewportUpdate(msg))
 }
 
 func (m ChatModel) View() string {
@@ -133,9 +133,9 @@ func (m ChatModel) View() string {
 	ta := zone.Mark(chatTxtarea, m.chatTxtarea.View())
 	ta = renderChatTextarea(ta, m.chatTxtarea.Focused())
 	chatTextareaHeight = lipgloss.Height(ta)
-	m.chatViewport.vp.Height = chatHeight() - (chatHeaderHeight + chatTextareaHeight)
-	if m.chatTxtarea.Focused() { // only works after setting vp height
-		m.chatViewport.vp.GotoBottom()
+	m.chatViewport.chatVp.Height = chatHeight() - (chatHeaderHeight + chatTextareaHeight)
+	if m.chatTxtarea.Focused() { // only works after setting chatVp height
+		m.chatViewport.chatVp.GotoBottom()
 	}
 	chatView := m.chatViewport.View()
 	chatView = zone.Mark(chatViewport, chatView)

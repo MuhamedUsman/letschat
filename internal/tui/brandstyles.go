@@ -271,11 +271,35 @@ var (
 				BorderForeground(primaryColor).
 				Padding(0, 1).
 				Foreground(primaryColor)
+)
 
-	onlineIndicator = lipgloss.NewStyle().
-			Foreground(greenColor).
-			Inline(true).
-			Render("●")
+var (
+	msgInfoHeaderStyle = lipgloss.NewStyle().
+				Background(primaryContrastColor).
+				Foreground(primaryColor).
+				Margin(2, 5, 0, 5).
+				Padding(0, 2).
+				Italic(true)
+
+	msgInfoBodyStyle = lipgloss.NewStyle().
+				BorderStyle(lipgloss.ThickBorder()).
+				BorderLeft(true).
+				BorderForeground(primaryColor).
+				Foreground(primaryColor).
+				Margin(2, 5, 0, 5).
+				PaddingLeft(2).
+				Italic(true)
+
+	msgInfoFooterStyle = lipgloss.NewStyle().
+				Margin(2, 5).
+				Foreground(primarySubtleDarkColor)
+
+	msgInfoContainerBtn = lipgloss.NewStyle().
+				Margin(2, 5, 1, 5)
+
+	msgInfoBtnStyle = lipgloss.NewStyle().
+			MarginRight(1).
+			Padding(0, 2)
 )
 
 var ( // Bunny Stying
