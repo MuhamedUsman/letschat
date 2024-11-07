@@ -171,6 +171,10 @@ func (c *Client) SetMsgAsRead(msg *domain.Message) error {
 	return nil
 }
 
+func (c *Client) DeleteMsgForMe(msgId string) error {
+	return c.repo.DeleteMsg(msgId)
+}
+
 // Helpers & Stuff -----------------------------------------------------------------------------------------------------
 
 func (c *Client) setMsgAsDelivered(msgID, receiverID string) error {

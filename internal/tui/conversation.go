@@ -183,8 +183,6 @@ func (m ConversationModel) Update(msg tea.Msg) (ConversationModel, tea.Cmd) {
 		cmd := m.conversationList.InsertItem(0, populateConvoItem(0, convo, renderState))
 		return m, cmd
 
-	case UsrOnlineMsg:
-
 	}
 
 	return m, tea.Batch(m.handleConversationListUpdate(msg))

@@ -42,10 +42,6 @@ type selDiscUserMsg struct { // selected Discovered User Msg
 
 type SentMsg *domain.Message
 
-type UsrOnlineMsg *domain.Message
-
-type UsrOfflineMsg *domain.Message
-
 type echoTypingMsg struct{}
 
 func echoTypingCmd() tea.Cmd {
@@ -55,3 +51,7 @@ func echoTypingCmd() tea.Cmd {
 		return echoTypingMsg{}
 	}
 }
+
+type deleteForMeSuccessMsg string // stores id of the deleted msg, remove msg with this id from the msgs slice
+
+type deleteForEveryoneSuccessMsg struct{}

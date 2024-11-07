@@ -49,9 +49,10 @@ type ChatViewportModel struct {
 	fetching                  bool
 	recvTypingTimer           timer.Model
 	lastTypingStateReceivedAt time.Time
-	prevLineCount             int
-	client                    *client.Client
-	mb                        msgBroadcast
+	// only used when msgPage is received
+	prevLineCount int
+	client        *client.Client
+	mb            msgBroadcast
 }
 
 func InitialChatViewport(c *client.Client) ChatViewportModel {
@@ -169,6 +170,14 @@ func (m ChatViewportModel) Update(msg tea.Msg) (ChatViewportModel, tea.Cmd) {
 				if m.selMsgDialogBtn == 0 {
 					_ = clipboard.WriteAll(m.getSelMsgFromMsgSlice().Body)
 				}
+				if m.selMsgDialogBtn == 1 {
+					if m.selMsgId != nil {
+						return m, m.deleteForMe(*m.selMsgId)
+					}
+				}
+				if m.selMsgDialogBtn == 2 {
+					//return m, m.deleteForEveryone(*m.selMsgId)
+				}
 			}
 		}
 
@@ -229,6 +238,7 @@ func (m ChatViewportModel) Update(msg tea.Msg) (ChatViewportModel, tea.Cmd) {
 	case *domain.Message:
 		var cmd tea.Cmd
 		switch msg.Operation {
+
 		case domain.CreateMsg:
 			m.msgs = append([]*domain.Message{msg}, m.msgs...)
 			m.chatVp.SetContent(m.renderChatViewport())
@@ -239,6 +249,7 @@ func (m ChatViewportModel) Update(msg tea.Msg) (ChatViewportModel, tea.Cmd) {
 				msg.ReadAt = &t
 				m.setMsgAsRead(msg)
 			}
+
 		case domain.UpdateMsg:
 			m.updateMsgInMsgs(msg)
 			// the above op will update the msgs so we need to rerender
@@ -247,6 +258,17 @@ func (m ChatViewportModel) Update(msg tea.Msg) (ChatViewportModel, tea.Cmd) {
 			} else {
 				m.chatVp.SetContent(m.renderChatViewport())
 			}
+
+		case domain.DeleteMsg:
+			m.deleteMsgInMsgs(msg.ID)
+			// the deleted msg is selected then:
+			if m.selMsgId != nil && *m.selMsgId == msg.ID {
+				m.selMsgId = nil
+				// rerender to remove the deleted msg
+				m.chatVp.SetContent(m.renderChatViewport())
+				m.msgDialogVp.SetContent(m.renderMsgDialogViewport())
+			}
+			m.chatVp.SetContent(m.renderChatViewport())
 
 		case domain.UserTypingMsg:
 			selUserTyping = true
@@ -272,6 +294,16 @@ func (m ChatViewportModel) Update(msg tea.Msg) (ChatViewportModel, tea.Cmd) {
 		m.chatVp.SetContent(m.renderChatViewport())
 		m.chatVp.LineDown(3) // GotoBottom does not work here as intended
 		return m, m.handleChatViewportUpdate(msg)
+
+	case deleteForMeSuccessMsg:
+		m.selMsgId = nil
+		m.deleteMsgInMsgs(string(msg))
+		prevLineCount := m.chatVp.TotalLineCount()
+		m.msgDialogVp.SetContent(m.renderMsgDialogViewport())
+		m.chatVp.SetContent(m.renderChatViewport())
+		currLineCount := m.chatVp.TotalLineCount()
+		// for the viewport to go down, not show empty spaces
+		m.chatVp.LineDown(prevLineCount - currLineCount)
 
 	case timer.TickMsg:
 		if m.recvTypingTimer.ID() == msg.ID {
@@ -346,6 +378,9 @@ func (m *ChatViewportModel) renderChatViewport() string {
 func (m ChatViewportModel) renderMsgDialogViewport() string {
 	// get the message
 	infoMsg := m.getSelMsgFromMsgSlice()
+	if infoMsg == nil {
+		return ""
+	}
 	var head, body, btnContainer, foot string
 	headTxt := "YOU"
 	if infoMsg.SenderID == selUserID {
@@ -539,4 +574,27 @@ func (m ChatViewportModel) setMsgAsRead(msg *domain.Message) {
 	m.client.BT.Run(func(shtdwnCtx context.Context) {
 		_ = m.client.SetMsgAsRead(msg) // ignore as we can retry
 	})
+}
+
+// once the message is deleted, this deletes it from the msg slice, if not exists -> NOOP
+func (m *ChatViewportModel) deleteMsgInMsgs(msgId string) {
+	for i, mesg := range m.msgs {
+		if mesg.ID == msgId {
+			// [inclusive:exclusive]
+			m.msgs = append(m.msgs[:i], m.msgs[i+1:]...)
+			break
+		}
+	}
+}
+
+func (m ChatViewportModel) deleteForMe(msgId string) tea.Cmd {
+	return func() tea.Msg {
+		if err := m.client.DeleteMsgForMe(msgId); err != nil {
+			return &errMsg{
+				err:  "Unable to delete this message",
+				code: 0,
+			}
+		}
+		return deleteForMeSuccessMsg(msgId)
+	}
 }

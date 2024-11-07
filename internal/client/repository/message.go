@@ -91,7 +91,7 @@ func (r LocalMessageRepository) DeleteMsg(id string) error {
 	query := `
 		DELETE FROM message WHERE id = $1
 	`
-	_, err := r.db.NamedExec(query, id)
+	_, err := r.db.Exec(query, id)
 	return err
 }
 
