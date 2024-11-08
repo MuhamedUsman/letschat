@@ -176,7 +176,7 @@ func (m ChatViewportModel) Update(msg tea.Msg) (ChatViewportModel, tea.Cmd) {
 					}
 				}
 				if m.selMsgDialogBtn == 2 {
-					//return m, m.deleteForEveryone(*m.selMsgId)
+					return m, m.deleteForEveryone(*m.selMsgId)
 				}
 			}
 		}
@@ -206,12 +206,6 @@ func (m ChatViewportModel) Update(msg tea.Msg) (ChatViewportModel, tea.Cmd) {
 					m.selMsgDialogBtn = 2
 				}
 				m.msgDialogVp.SetContent(m.renderMsgDialogViewport())
-			} else if msg.Action == tea.MouseActionRelease {
-				if m.selMsgId != nil {
-					if m.selMsgDialogBtn == 0 {
-						_ = clipboard.WriteAll(m.getSelMsgFromMsgSlice().Body)
-					}
-				}
 			}
 		}
 
@@ -265,10 +259,17 @@ func (m ChatViewportModel) Update(msg tea.Msg) (ChatViewportModel, tea.Cmd) {
 			if m.selMsgId != nil && *m.selMsgId == msg.ID {
 				m.selMsgId = nil
 				// rerender to remove the deleted msg
-				m.chatVp.SetContent(m.renderChatViewport())
 				m.msgDialogVp.SetContent(m.renderMsgDialogViewport())
 			}
+			prevLineCount := m.chatVp.TotalLineCount()
 			m.chatVp.SetContent(m.renderChatViewport())
+			currLineCount := m.chatVp.TotalLineCount()
+			// for the viewport to go down, not show empty spaces
+			if m.chatVp.PastBottom() {
+				m.chatVp.GotoBottom()
+			} else {
+				m.chatVp.LineDown(max(0, prevLineCount-currLineCount))
+			}
 
 		case domain.UserTypingMsg:
 			selUserTyping = true
@@ -295,7 +296,7 @@ func (m ChatViewportModel) Update(msg tea.Msg) (ChatViewportModel, tea.Cmd) {
 		m.chatVp.LineDown(3) // GotoBottom does not work here as intended
 		return m, m.handleChatViewportUpdate(msg)
 
-	case deleteForMeSuccessMsg:
+	case deleteMsgSuccess:
 		m.selMsgId = nil
 		m.deleteMsgInMsgs(string(msg))
 		prevLineCount := m.chatVp.TotalLineCount()
@@ -303,7 +304,11 @@ func (m ChatViewportModel) Update(msg tea.Msg) (ChatViewportModel, tea.Cmd) {
 		m.chatVp.SetContent(m.renderChatViewport())
 		currLineCount := m.chatVp.TotalLineCount()
 		// for the viewport to go down, not show empty spaces
-		m.chatVp.LineDown(prevLineCount - currLineCount)
+		if m.chatVp.PastBottom() {
+			m.chatVp.GotoBottom()
+		} else {
+			m.chatVp.LineDown(max(0, prevLineCount-currLineCount))
+		}
 
 	case timer.TickMsg:
 		if m.recvTypingTimer.ID() == msg.ID {
@@ -595,6 +600,27 @@ func (m ChatViewportModel) deleteForMe(msgId string) tea.Cmd {
 				code: 0,
 			}
 		}
-		return deleteForMeSuccessMsg(msgId)
+		return deleteMsgSuccess(msgId)
+	}
+}
+
+func (m ChatViewportModel) deleteForEveryone(msgId string) tea.Cmd {
+	t := time.Now()
+	delMsg := &domain.Message{
+		ID:           msgId,
+		SenderID:     m.client.CurrentUsr.ID,
+		ReceiverID:   selUserID,
+		SentAt:       &t,
+		Operation:    domain.DeleteMsg,
+		Confirmation: 0,
+	}
+	return func() tea.Msg {
+		if err := m.client.DeleteMsgForEveryone(delMsg); err != nil {
+			return &errMsg{
+				err:  "Unable to delete this message from the receiver",
+				code: 0,
+			}
+		}
+		return deleteMsgSuccess(msgId)
 	}
 }

@@ -52,6 +52,4 @@ func echoTypingCmd() tea.Cmd {
 	}
 }
 
-type deleteForMeSuccessMsg string // stores id of the deleted msg, remove msg with this id from the msgs slice
-
-type deleteForEveryoneSuccessMsg struct{}
+type deleteMsgSuccess string // stores id of the deleted msg, remove msg with this id from the msgs slice

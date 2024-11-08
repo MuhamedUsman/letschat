@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/M0hammadUsman/letschat/internal/domain"
 	"github.com/M0hammadUsman/letschat/internal/sync"
 	"log/slog"
@@ -130,11 +131,9 @@ func (c *Client) handleReceivedMsgs(shtdwnCtx context.Context) {
 
 			case domain.UserOnlineMsg:
 				c.setUsrOnlineStatus(msg, true)
-				//c.getPopulateSaveConvosAndWriteToChan()
 
 			case domain.UserOfflineMsg:
 				c.setUsrOnlineStatus(msg, false)
-				//c.getPopulateSaveConvosAndWriteToChan()
 			}
 
 		case <-shtdwnCtx.Done():
@@ -172,7 +171,25 @@ func (c *Client) SetMsgAsRead(msg *domain.Message) error {
 }
 
 func (c *Client) DeleteMsgForMe(msgId string) error {
-	return c.repo.DeleteMsg(msgId)
+	if err := c.repo.DeleteMsg(msgId); err != nil {
+		return err
+	}
+	c.getPopulateSaveConvosAndWriteToChan()
+	return nil
+}
+
+func (c *Client) DeleteMsgForEveryone(msg *domain.Message) error {
+	// this may block, in theory, depends on the connection
+	c.sentMsgs.msgs <- msg
+	if <-c.sentMsgs.done {
+		if err := c.DeleteMsgForMe(msg.ID); err != nil {
+			return err
+		}
+		c.getPopulateSaveConvosAndWriteToChan()
+		return nil
+	} else {
+		return fmt.Errorf("ws conn closed due to error while deleting the message from the receiver")
+	}
 }
 
 // Helpers & Stuff -----------------------------------------------------------------------------------------------------
