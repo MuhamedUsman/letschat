@@ -39,7 +39,11 @@ type ChatViewportModel struct {
 	msgDialogVp        viewport.Model
 	msgs               []*domain.Message
 	currPage, lastPage int
-	selUsrID           string
+	// used to determine the border style of the msg bubble, starting bubble will have a top corner protruding
+	startingBubble bool
+	// also used in the process of determine the border style of the msg bubble
+	prevRenderedMsg *domain.Message
+	selUsrID        string
 	// currently selected msg (sent one) for info, we'll hide the dialog once the selMsgId is nil
 	selMsgId *string
 	// current button selection once the msg info dialog in focus,
@@ -188,6 +192,7 @@ func (m ChatViewportModel) Update(msg tea.Msg) (ChatViewportModel, tea.Cmd) {
 					m.selMsgId = &mesg.ID
 					m.selMsgDialogBtn = 0
 					m.msgDialogVp.SetContent(m.renderMsgDialogViewport())
+					m.msgDialogVp.GotoTop() // to remove previous render scroll position
 					break
 				}
 			}
@@ -484,7 +489,14 @@ func (m *ChatViewportModel) getSelMsgFromMsgSlice() *domain.Message {
 
 func (m *ChatViewportModel) renderBubbleWithStatusInfo(msg *domain.Message) string {
 	txtWidth := min(chatWidth()-20, lipgloss.Width(msg.Body)+2)
-	bubble := chatBubbleLStyle.Width(txtWidth).Render(msg.Body)
+	bubbleStyle := chatBubbleLStyle.Width(txtWidth)
+	// if prev msg sender is the same as current msg sender, do not show the protruding edge
+	if m.prevRenderedMsg != nil &&
+		m.prevRenderedMsg.SenderID == msg.SenderID &&
+		m.prevRenderedMsg.SentAt.Day() == msg.SentAt.Day() {
+		bubbleStyle = bubbleStyle.BorderStyle(lipgloss.RoundedBorder())
+	}
+	bubble := bubbleStyle.Render(msg.Body)
 	sentAt := lipgloss.NewStyle().Faint(true).Foreground(whiteColor).SetString(msg.SentAt.Format(time.Kitchen))
 
 	var status string
@@ -500,12 +512,22 @@ func (m *ChatViewportModel) renderBubbleWithStatusInfo(msg *domain.Message) stri
 	status = lipgloss.NewStyle().Faint(true).Foreground(primaryColor).Render(status)
 
 	if msg.SenderID == m.client.CurrentUsr.ID {
-		bubble = chatBubbleRStyle.Width(txtWidth).Render(msg.Body)
+		bubbleStyle = chatBubbleRStyle.Width(txtWidth)
+		if m.prevRenderedMsg != nil &&
+			m.prevRenderedMsg.SenderID == msg.SenderID &&
+			m.prevRenderedMsg.SentAt.Day() == msg.SentAt.Day() {
+			bubbleStyle = bubbleStyle.BorderStyle(lipgloss.RoundedBorder())
+		}
+		// set the prevRenderedMsg to current msg senderId, once we are done with its use
+		m.prevRenderedMsg = msg
+		bubble = bubbleStyle.Render(msg.Body)
 		// mark the msg with zone on the right side so we can pick these up using mouse clicks
 		bubble = zone.Mark(msg.ID, bubble)
 		sentAt = sentAt.Foreground(primaryColor)
 		return lipgloss.JoinHorizontal(lipgloss.Center, status, " ", sentAt.Render(), " ", bubble)
 	}
+	// set the prevRenderedMsg to current msg senderId, once we are done with its use
+	m.prevRenderedMsg = msg
 	// mark the msg with zone on the left side so we can pick these up using mouse clicks
 	bubble = zone.Mark(msg.ID, bubble)
 	return lipgloss.JoinHorizontal(lipgloss.Center, bubble, " ", sentAt.Render())
