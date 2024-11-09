@@ -12,6 +12,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	zone "github.com/lrstanley/bubblezone"
 	"log/slog"
+	"net/http"
 	"slices"
 	"strings"
 	"time"
@@ -357,6 +358,10 @@ func (m *ChatViewportModel) renderChatViewport() string {
 	cb := chatBubbleContainer.Width(chatWidth() - chatBubbleContainer.GetHorizontalFrameSize())
 	for i := len(m.msgs) - 1; i >= 0; i-- {
 		msg := m.msgs[i]
+		// TODO: Handle this, a rare edge case
+		/*if msg.SentAt == nil {
+			return ""
+		}*/
 		if msg.SentAt.Day() != prevMsgDay {
 			prevMsgDay = msg.SentAt.Day()
 			s := lipgloss.NewStyle().
@@ -637,6 +642,12 @@ func (m ChatViewportModel) deleteForEveryone(msgId string) tea.Cmd {
 		Confirmation: 0,
 	}
 	return func() tea.Msg {
+		if m.client.WsConnState.Get() != client.Connected {
+			return &errMsg{
+				err:  "No Connection, unable to delete message.",
+				code: http.StatusRequestTimeout,
+			}
+		}
 		if err := m.client.DeleteMsgForEveryone(delMsg); err != nil {
 			return &errMsg{
 				err:  "Unable to delete this message from the receiver",

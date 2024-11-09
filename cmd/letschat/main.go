@@ -5,6 +5,7 @@ import (
 	"github.com/M0hammadUsman/letschat/internal/client"
 	"github.com/M0hammadUsman/letschat/internal/tui"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/lmittmann/tint"
 	zone "github.com/lrstanley/bubblezone"
 	"log/slog"
@@ -30,6 +31,7 @@ func main() {
 	defer f.Close()
 
 	zone.NewGlobal()
+	_ = lipgloss.DefaultRenderer().HasDarkBackground()
 	_, err = tea.NewProgram(
 		tui.InitialTabContainerModel(),
 		tea.WithAltScreen(),

@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/google/uuid"
 	zone "github.com/lrstanley/bubblezone"
+	"net/http"
 	"strings"
 	"time"
 )
@@ -216,8 +217,14 @@ func (m *ChatModel) sendMessage(msg string) tea.Cmd {
 		Operation:    domain.CreateMsg,
 		Confirmation: 0,
 	}
-	go m.client.SendMessage(msgToSnd)
 	return func() tea.Msg {
+		if m.client.WsConnState.Get() != client.Connected {
+			return &errMsg{
+				err:  "No Connection, Unable to send message.",
+				code: http.StatusRequestTimeout,
+			}
+		}
+		go m.client.SendMessage(msgToSnd)
 		// will be used in ChatViewportModel's update method
 		return SentMsg(&msgToSnd)
 	}

@@ -168,10 +168,12 @@ func (m ConversationModel) Update(msg tea.Msg) (ConversationModel, tea.Cmd) {
 		)
 
 	case selDiscUserMsg:
+		t := time.Now()
 		convo := &domain.Conversation{
-			UserID:    msg.id,
-			Username:  msg.name,
-			UserEmail: msg.email,
+			UserID:     msg.id,
+			Username:   msg.name,
+			UserEmail:  msg.email,
+			LastOnline: &t,
 		}
 		m.selDiscUserConvo = convo
 		selUserID = msg.id
@@ -183,6 +185,15 @@ func (m ConversationModel) Update(msg tea.Msg) (ConversationModel, tea.Cmd) {
 		cmd := m.conversationList.InsertItem(0, populateConvoItem(0, convo, renderState))
 		return m, cmd
 
+	case createdConvoMsg:
+		renderState := false
+		if m.client.WsConnState.Get() == client.Connected {
+			renderState = true
+		}
+		// after the convo is created in the db, we remove it from here, now the getConversation() will show it
+		m.selDiscUserConvo = nil
+		cmd := m.conversationList.InsertItem(0, populateConvoItem(0, msg, renderState))
+		return m, cmd
 	}
 
 	return m, tea.Batch(m.handleConversationListUpdate(msg))
@@ -278,10 +289,10 @@ func populateConvoItem(i int, convo *domain.Conversation, renderState bool) conv
 func renderStateInfo(convo *domain.Conversation) string {
 	t := convo.LastOnline
 	if t == nil {
-		return fmt.Sprint(" ", "🔥")
+		return conversationOnlineIndicator
 	}
-	//d := time.Since(*t).Truncate(time.Minute)
-	return fmt.Sprint(" ", "❄️")
+	// TODO: Show last seen instead of ❄️
+	return ""
 }
 
 func containsSelConvo(convos []*domain.Conversation, convoUsrID string) bool {
@@ -318,11 +329,11 @@ func (m ConversationModel) getConversations() tea.Cmd {
 			if m.client.WsConnState.Get() == client.Connected {
 				renderState = true
 			}
-			if i == 0 { // add it to first idx
+			/*if i == 0 { // add it to first idx
 				if m.selDiscUserConvo != nil && !containsSelConvo(convos, m.selDiscUserConvo.UserID) {
 					c = append(c, populateConvoItem(-1, m.selDiscUserConvo, renderState))
 				}
-			}
+			}*/
 			item := populateConvoItem(i, convo, renderState)
 			c = append(c, item)
 		}
@@ -337,7 +348,7 @@ func (m ConversationModel) getSelConvoUsrID() string {
 	}
 	fv := m.conversationList.SelectedItem().FilterValue()
 	idWithSomeStylingTxt := strings.Split(fv, "|")[1] // 033d13fa-b6d8-43db-b288-34fe801570e6[1012z
-	return idWithSomeStylingTxt[:36]
+	return idWithSomeStylingTxt[:36]                  // 033d13fa-b6d8-43db-b288-34fe801570e6
 }
 
 func (m ConversationModel) getSelConvoUsername() string {
@@ -349,10 +360,14 @@ func (m ConversationModel) getSelConvoUsername() string {
 }
 
 func (m ConversationModel) createConvoIfNotExist() tea.Cmd {
-	if err := m.client.CreateConvoIfNotExist(m.selDiscUserConvo); err != nil {
-		return func() tea.Msg {
+	return func() tea.Msg {
+		createdConvo, err := m.client.CreateConvoIfNotExist(m.selDiscUserConvo)
+		if err != nil {
 			return &errMsg{err: "Unable to create the conversation", code: 0}
 		}
+		if createdConvo != nil {
+			return createdConvoMsg(createdConvo)
+		}
+		return nil
 	}
-	return nil
 }

@@ -210,6 +210,10 @@ var ( // Conversation Styling
 
 	conversationActiveSearchBarStyle = conversationSearchBarStyle.
 						BorderForeground(primaryColor)
+
+	conversationOnlineIndicator = lipgloss.NewStyle().
+					Foreground(greenColor).
+					Render(" *")
 )
 
 var (

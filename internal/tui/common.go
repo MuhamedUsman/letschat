@@ -53,3 +53,5 @@ func echoTypingCmd() tea.Cmd {
 }
 
 type deleteMsgSuccess string // stores id of the deleted msg, remove msg with this id from the msgs slice
+
+type createdConvoMsg *domain.Conversation
