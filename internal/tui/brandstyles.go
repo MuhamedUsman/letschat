@@ -275,6 +275,13 @@ var (
 				BorderForeground(primaryColor).
 				Padding(0, 1).
 				Foreground(primaryColor)
+
+	chatMenuBtnContainerStyle = lipgloss.NewStyle().
+					Margin(0, 2)
+
+	chatMenuBtnStyle = lipgloss.NewStyle().
+				Margin(0, 1).
+				Padding(0, 2)
 )
 
 var (

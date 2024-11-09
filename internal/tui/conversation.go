@@ -54,7 +54,6 @@ func InitialConversationModel(c *client.Client) ConversationModel {
 	m.FilterInput = newConversationTxtInput("Filter by name...")
 	m.KeyMap = getConversationListKeyMap(true)
 	m.SetStatusBarItemName("Conversation", "Conversations")
-	m.DisableQuitKeybindings()
 	m.SetShowFilter(false)
 	m.SetShowHelp(false)
 	m.SetShowTitle(false)
@@ -257,8 +256,10 @@ func applyCustomConversationListStyling(m list.Model) list.Model {
 func getConversationListKeyMap(enabled bool) list.KeyMap {
 	km := list.DefaultKeyMap()
 	km.Filter = key.NewBinding(key.WithKeys("ctrl+f"), key.WithHelp("ctrl+f", "filter by name"))
+	kb := key.NewBinding() // disable keybindings when out of focus
+	km.Quit = kb           // default
+	km.ForceQuit = kb      // default
 	if !enabled {
-		kb := key.NewBinding() // disable keybindings when out of focus
 		km.CursorUp = kb
 		km.CursorDown = kb
 		km.NextPage = kb

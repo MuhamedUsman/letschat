@@ -68,7 +68,7 @@ func (m OtpModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.errMsg.err = ""
 		m.otp.PlaceholderStyle = lipgloss.NewStyle().Foreground(darkGreyColor)
 		switch msg.String() {
-		case "ctrl+c", "q":
+		case "ctrl+c":
 			return m, tea.Quit
 		case "enter":
 			if m.tabIdx == 0 {
