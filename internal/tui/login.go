@@ -82,7 +82,7 @@ func (m LoginModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.dangerState = false // once there is a keypress remove the danger state
 		m.errMsg.err = ""
 		switch msg.String() {
-		case "ctrl+c", "q":
+		case "ctrl+c":
 			return m, tea.Quit
 		case "enter":
 			s := msg.String()

@@ -14,9 +14,12 @@ import (
 )
 
 const (
-	chatMenu     = "chatMenu"
-	chatViewport = "chatViewport"
-	chatTxtarea  = "chatTxtarea"
+	chatHeaderContainer = "chatHeaderContainer"
+	chatMenu            = "chatMenu"
+	menuGotoFirstMsgBtn = "menuGotoFirstMsgBtn"
+	menuClearConvoBtn   = "menuClearConvoBtn"
+	chatViewport        = "chatViewport"
+	chatTxtarea         = "chatTxtarea"
 )
 
 type ChatModel struct {
@@ -24,14 +27,17 @@ type ChatModel struct {
 	chatViewport   ChatViewportModel
 	focus          bool
 	prevChatLength int
-	client         *client.Client
-	cb             convosBroadcast
+	// menu buttons, -1 -> None Selected | 0 -> Goto First Msg | 1 -> Clear Conversation
+	menuBtnIdx int
+	client     *client.Client
+	cb         convosBroadcast
 }
 
 func InitialChatModel(c *client.Client) ChatModel {
 	return ChatModel{
 		chatTxtarea:  newChatTxtArea(),
 		chatViewport: InitialChatViewport(c),
+		menuBtnIdx:   -1,
 		client:       c,
 	}
 }
@@ -71,7 +77,22 @@ func (m ChatModel) Update(msg tea.Msg) (ChatModel, tea.Cmd) {
 			}
 			m.chatTxtarea.Reset()
 			return m, tea.Batch(m.sendMessage(s), m.handleChatTextareaUpdate(msg), m.handleChatViewportUpdate(msg))
+		case "left":
+			if m.menuBtnIdx == 1 {
+				m.menuBtnIdx--
+			}
+		case "right":
+			if m.menuBtnIdx == 0 {
+				m.menuBtnIdx++
+			}
+		case "tab":
+			if m.menuBtnIdx > -1 && m.menuBtnIdx <= 1 {
+				m.menuBtnIdx = (m.menuBtnIdx + 1) % 2
+			}
 		case "esc":
+			if m.menuBtnIdx != -1 {
+				m.menuBtnIdx = -1
+			}
 			m.chatTxtarea.Blur()
 			m.updateChatTxtareaAndViewportDimensions()
 		}
@@ -95,6 +116,16 @@ func (m ChatModel) Update(msg tea.Msg) (ChatModel, tea.Cmd) {
 				m.chatTxtarea.SetCursor(max(0, m.chatTxtarea.LineInfo().CharOffset-1))
 			}
 		default:
+		}
+
+		if zone.Get(chatMenu).InBounds(msg) &&
+			msg.Button == tea.MouseButtonLeft &&
+			msg.Action == tea.MouseActionRelease {
+			m.menuBtnIdx = 0
+		}
+
+		if !zone.Get(chatHeaderContainer).InBounds(msg) {
+			m.menuBtnIdx = -1
 		}
 
 		if zone.Get(chatTxtarea).InBounds(msg) {
@@ -130,6 +161,9 @@ func (m ChatModel) View() string {
 			Render(rabbit)
 	}
 	h := renderChatHeader(selUsername, selUserTyping)
+	if m.menuBtnIdx != -1 {
+		h = renderMenuBtns(m.menuBtnIdx)
+	}
 	chatHeaderHeight = lipgloss.Height(h)
 	ta := zone.Mark(chatTxtarea, m.chatTxtarea.View())
 	ta = renderChatTextarea(ta, m.chatTxtarea.Focused())
@@ -171,7 +205,7 @@ func renderChatHeader(name string, typing bool) string {
 		MarginLeft(menuMarginLeft).
 		Render(menu)
 	name = lipgloss.NewStyle().Blink(typing).Render(name)
-	return c.Render(name, menu)
+	return zone.Mark(chatHeaderContainer, c.Render(name, menu))
 }
 
 func renderChatTextarea(ta string, padding bool) string {
@@ -182,6 +216,53 @@ func renderChatTextarea(ta string, padding bool) string {
 		cStyle = cStyle.Height(5)
 	}
 	return cStyle.Render(ta)
+}
+
+func renderMenuBtns(selection int) string {
+	if selection == -1 {
+		return ""
+	}
+
+	gotoFirstMsgBtn := renderGotoFirstMsgBtn(true)
+	clearConvoBtn := renderClearConvoBtn(false)
+	if selection == 1 {
+		gotoFirstMsgBtn = renderGotoFirstMsgBtn(false)
+		clearConvoBtn = renderClearConvoBtn(true)
+	}
+	gotoFirstMsgBtn = zone.Mark(menuGotoFirstMsgBtn, gotoFirstMsgBtn)
+	clearConvoBtn = zone.Mark(menuClearConvoBtn, clearConvoBtn)
+	btnContainer := chatMenuBtnContainerStyle.Render(gotoFirstMsgBtn, clearConvoBtn)
+
+	c := chatHeaderStyle.Width(chatWidth())
+	content := lipgloss.PlaceHorizontal(chatWidth()-c.GetHorizontalFrameSize(), lipgloss.Center, btnContainer)
+
+	return zone.Mark(chatHeaderContainer, c.Render(content))
+}
+
+func renderGotoFirstMsgBtn(focus bool) string {
+	bg := primaryColor
+	fg := primaryContrastColor
+	if !focus {
+		bg = darkGreyColor
+		fg = lightGreyColor
+	}
+	return chatMenuBtnStyle.
+		Background(bg).
+		Foreground(fg).
+		Render("GOTO FIRST MESSAGE")
+}
+
+func renderClearConvoBtn(focus bool) string {
+	bg := dangerColor
+	fg := whiteColor
+	if !focus {
+		bg = darkGreyColor
+		fg = lightGreyColor
+	}
+	return chatMenuBtnStyle.
+		Background(bg).
+		Foreground(fg).
+		Render("CLEAR CONVERSATION")
 }
 
 func (m *ChatModel) handleChatTextareaUpdate(msg tea.Msg) tea.Cmd {

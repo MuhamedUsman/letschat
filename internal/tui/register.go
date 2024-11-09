@@ -89,7 +89,7 @@ func (m UserRegisterModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.errMsg.err = ""
 		switch msg.String() {
 
-		case "ctrl+c", "q":
+		case "ctrl+c":
 			return m, tea.Quit
 
 		case "enter":
