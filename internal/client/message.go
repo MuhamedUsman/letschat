@@ -174,6 +174,7 @@ func (c *Client) DeleteMsgForMe(msgId string) error {
 	if err := c.repo.DeleteMsg(msgId); err != nil {
 		return err
 	}
+	// update convos as the deleted msg may be the recent one
 	c.getPopulateSaveConvosAndWriteToChan()
 	return nil
 }

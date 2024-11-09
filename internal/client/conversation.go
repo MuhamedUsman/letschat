@@ -94,6 +94,9 @@ func (c *Client) populateConvosWithLatestMsgs(convos []*domain.Conversation) []*
 		if msg, ok := latestMsgs[convo.UserID]; ok {
 			convos[i].LatestMsg = msg.Body
 			convos[i].LatestMsgSentAt = msg.SentAt
+		} else {
+			convos[i].LatestMsg = nil
+			convos[i].LatestMsgSentAt = nil
 		}
 	}
 	// sort in descending order latest msgs conversations first
