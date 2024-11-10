@@ -248,7 +248,7 @@ var (
 		Bottom:      "─",
 		Left:        "│",
 		Right:       "│",
-		TopLeft:     "╮",
+		TopLeft:     "╰",
 		TopRight:    "╮",
 		BottomLeft:  "╰",
 		BottomRight: "╯",
@@ -260,7 +260,7 @@ var (
 		Left:        "│",
 		Right:       "│",
 		TopLeft:     "╭",
-		TopRight:    "╭",
+		TopRight:    "╯",
 		BottomLeft:  "╰",
 		BottomRight: "╯",
 	}

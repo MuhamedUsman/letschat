@@ -24,6 +24,7 @@ func main() {
 		os.Exit(1)
 	}
 	f, err := tea.LogToFile("Letschat.log", "Letschat")
+	slog.SetDefault(slog.New(slog.NewTextHandler(f, &slog.HandlerOptions{AddSource: true})))
 	if err != nil {
 		slogger.Error(err.Error())
 		os.Exit(1)

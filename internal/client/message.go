@@ -17,7 +17,7 @@ var (
 
 type sentMsgs struct {
 	msgs chan<- *domain.Message
-	// once we send a message we read on this chan to ensure that the message is sent to the server
+	// once we send a message, we read on this chan to ensure that the message is sent to the server
 	done <-chan bool
 }
 
@@ -30,7 +30,7 @@ func newRecvMsgsBroadcaster() *RecvMsgsBroadcaster {
 func (c *Client) SendMessage(msg domain.Message) {
 	c.sentMsgs.msgs <- &msg // this will send the msg
 	// if it's not sent save it to db without the sentAt field
-	// then once we establish the conn back, we,ll retry those
+	// then, once we establish the conn back, we'll retry those
 	if !<-c.sentMsgs.done {
 		msg.SentAt = nil
 		if err := c.repo.SaveMsg(&msg); err != nil {
@@ -147,25 +147,47 @@ func (c *Client) SetMsgAsRead(msg *domain.Message) error {
 		ID:         msg.ID,
 		SenderID:   c.CurrentUsr.ID,
 		ReceiverID: msg.SenderID, // confirm that message is read
-		ReadAt:     msg.ReadAt,   // if provided use that
+		ReadAt:     msg.ReadAt,   // if provided, use that
 		Operation:  domain.UpdateMsg,
 	}
-	if msgToSend.ReadAt != nil {
+	if msgToSend.ReadAt == nil {
 		msgToSend.ReadAt = ptr(time.Now())
 	}
 	// this may block, in theory, depends on the connection
 	c.sentMsgs.msgs <- msgToSend
 	if !<-c.sentMsgs.done {
 		// still update in local db with readAt, retry, once again when there is a connection established
-		if err := c.repo.UpdateMsg(msg); err != nil {
-			return err
+		for i := range 5 {
+			msgToUpdate, err := c.repo.GetMsgByID(msg.ID)
+			if err != nil {
+				return err
+			}
+			msgToUpdate.ReadAt = msg.ReadAt
+			if err = c.repo.UpdateMsg(msgToUpdate); err != nil {
+				if i == 4 {
+					return err
+				}
+			} else {
+				break
+			}
 		}
 		return ErrMsgNotSent
 	}
 	// once ok update the local msg with MsgReadConfirmed
-	msg.Confirmation = domain.MsgReadConfirmed
-	if err := c.repo.UpdateMsg(msg); err != nil {
-		return err
+	for i := range 5 {
+		msgToUpdate, err := c.repo.GetMsgByID(msg.ID)
+		if err != nil {
+			return err
+		}
+		msgToUpdate.ReadAt = msg.ReadAt
+		msgToUpdate.Confirmation = domain.MsgReadConfirmed
+		if err = c.repo.UpdateMsg(msgToUpdate); err != nil {
+			if i == 4 {
+				return err
+			}
+		} else {
+			break
+		}
 	}
 	return nil
 }
@@ -193,6 +215,15 @@ func (c *Client) DeleteMsgForEveryone(msg *domain.Message) error {
 	}
 }
 
+func (c *Client) DeleteForMeAllMsgsForConversation(senderId, receiverId string) error {
+	err := c.repo.DeleteAllForSenderAndReceiver(senderId, receiverId)
+	if err != nil {
+		return err
+	}
+	c.getPopulateSaveConvosAndWriteToChan()
+	return nil
+}
+
 // Helpers & Stuff -----------------------------------------------------------------------------------------------------
 
 func (c *Client) setMsgAsDelivered(msgID, receiverID string) error {
@@ -209,16 +240,22 @@ func (c *Client) setMsgAsDelivered(msgID, receiverID string) error {
 		return ErrMsgNotSent
 	}
 	// update in local DB
-	msgToUpdate, err := c.repo.GetMsgByID(msgID)
-	if err != nil {
-		return err
-	}
-	if msgToUpdate.ID == msg.ID {
-		msgToUpdate.DeliveredAt = msg.DeliveredAt
-	}
-	msg.Confirmation = domain.MsgDeliveredConfirmed
-	if err = c.repo.UpdateMsg(msgToUpdate); err != nil {
-		return err
+	for i := range 5 { // this can yield domain.ErrEditConflict so, retry
+		msgToUpdate, err := c.repo.GetMsgByID(msgID)
+		if err != nil {
+			return err
+		}
+		if msgToUpdate.ID == msg.ID {
+			msgToUpdate.DeliveredAt = msg.DeliveredAt
+		}
+		msg.Confirmation = domain.MsgDeliveredConfirmed
+		if err = c.repo.UpdateMsg(msgToUpdate); err != nil {
+			if i == 4 {
+				return err
+			}
+		} else {
+			break
+		}
 	}
 	return nil
 }

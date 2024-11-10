@@ -68,6 +68,7 @@ func (m ChatModel) Update(msg tea.Msg) (ChatModel, tea.Cmd) {
 		switch msg.String() {
 		case "ctrl+t":
 			typingCmd = m.chatTxtarea.Focus()
+			m.menuBtnIdx = -1
 			m.updateChatTxtareaAndViewportDimensions()
 		case "ctrl+s":
 			s := m.chatTxtarea.Value()
@@ -89,12 +90,21 @@ func (m ChatModel) Update(msg tea.Msg) (ChatModel, tea.Cmd) {
 			if m.menuBtnIdx > -1 && m.menuBtnIdx <= 1 {
 				m.menuBtnIdx = (m.menuBtnIdx + 1) % 2
 			}
-		case "esc":
+		case "esc", "ctrl+f":
 			if m.menuBtnIdx != -1 {
 				m.menuBtnIdx = -1
 			}
 			m.chatTxtarea.Blur()
 			m.updateChatTxtareaAndViewportDimensions()
+		case "enter":
+			switch m.menuBtnIdx {
+			case 0:
+				m.chatViewport.gotoFirstMsg = true
+				m.menuBtnIdx = -1
+			case 1:
+				m.menuBtnIdx = -1
+				return m, m.deleteAllMsgsForConvo()
+			}
 		}
 
 	case tea.MouseMsg:
@@ -155,6 +165,7 @@ func (m ChatModel) Update(msg tea.Msg) (ChatModel, tea.Cmd) {
 		return m, tea.Batch(cmd, echoTypingCmd())
 
 	}
+
 	return m, tea.Batch(typingCmd, m.handleChatTextareaUpdate(msg), m.handleChatViewportUpdate(msg))
 }
 
@@ -331,5 +342,17 @@ func (m *ChatModel) sendTypingStatus() tea.Cmd {
 	return func() tea.Msg {
 		m.client.SendTypingStatus(msgToSnd)
 		return nil
+	}
+}
+
+func (m ChatModel) deleteAllMsgsForConvo() tea.Cmd {
+	return func() tea.Msg {
+		if err := m.client.DeleteForMeAllMsgsForConversation(m.client.CurrentUsr.ID, selUserID); err != nil {
+			return &errMsg{
+				err:  "Unable to clear conversation",
+				code: 0,
+			}
+		}
+		return clearConvoSuccess{}
 	}
 }

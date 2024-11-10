@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"context"
 	"fmt"
 	"github.com/M0hammadUsman/letschat/internal/client"
 	"github.com/M0hammadUsman/letschat/internal/domain"
@@ -40,16 +39,14 @@ type ChatViewportModel struct {
 	msgDialogVp        viewport.Model
 	msgs               []*domain.Message
 	currPage, lastPage int
-	// used to determine the border style of the msg bubble, starting bubble will have a top corner protruding
-	startingBubble bool
-	// also used in the process of determine the border style of the msg bubble
-	prevRenderedMsg *domain.Message
-	selUsrID        string
+	selUsrID           string
 	// currently selected msg (sent one) for info, we'll hide the dialog once the selMsgId is nil
 	selMsgId *string
 	// current button selection once the msg info dialog in focus,
 	// 0 -> CopyBtn | 1 -> DeleteBtn
-	selMsgDialogBtn           int // -1 when the selMsgId is nil
+	selMsgDialogBtn int // -1 when the selMsgId is nil
+	// true if gotoFirstMsgMsg is sent, once at first msg, set to false
+	gotoFirstMsg              bool
 	focus                     bool
 	fetching                  bool
 	recvTypingTimer           timer.Model
@@ -63,8 +60,8 @@ type ChatViewportModel struct {
 func InitialChatViewport(c *client.Client) ChatViewportModel {
 	token, ch := c.RecvMsgs.Subscribe()
 	return ChatViewportModel{
-		chatVp: viewport.New(0, 0),
-		//msgDialogVp:     viewport.New(0, 0),
+		chatVp:          viewport.New(0, 0),
+		msgDialogVp:     viewport.New(0, 0),
 		msgs:            make([]*domain.Message, 0),
 		client:          c,
 		recvTypingTimer: timer.New(2 * time.Second),
@@ -103,12 +100,22 @@ func (m ChatViewportModel) Update(msg tea.Msg) (ChatViewportModel, tea.Cmd) {
 		m.selUsrID = selUserID
 		return m, m.getMsgAsPage(1)
 	}
+
 	if m.chatVp.AtTop() && !m.fetching {
 		if m.lastPage != m.currPage {
 			m.fetching = true
 			return m, m.getMsgAsPage(m.currPage + 1)
 		}
 	}
+
+	if m.gotoFirstMsg && !m.fetching {
+		m.chatVp.GotoTop()
+		if m.currPage == m.lastPage {
+			m.gotoFirstMsg = false
+		}
+		return m, nil
+	}
+
 	switch msg := msg.(type) {
 
 	case tea.WindowSizeMsg:
@@ -228,26 +235,27 @@ func (m ChatViewportModel) Update(msg tea.Msg) (ChatViewportModel, tea.Cmd) {
 		m.currPage = msg.meta.CurrentPage
 		m.lastPage = msg.meta.LastPage
 		m.chatVp.SetContent(m.renderChatViewport())
-		// Once we set the content it takes us to the top, we want to go to the point where the user were before
-		c := m.chatVp.TotalLineCount() - m.prevLineCount
-		m.chatVp.LineDown(c)
-		// Now update the prev line count
-		m.prevLineCount = m.chatVp.TotalLineCount()
+		if !m.gotoFirstMsg {
+			// Once content is set, it goes to the top, to go to the point where the user was before
+			c := m.chatVp.TotalLineCount() - m.prevLineCount
+			m.chatVp.LineDown(c)
+			// Now update the prev line count
+			m.prevLineCount = m.chatVp.TotalLineCount()
+		}
 		return m, m.handleChatViewportUpdate(msg)
 
 	case *domain.Message:
-		var cmd tea.Cmd
 		switch msg.Operation {
 
 		case domain.CreateMsg:
 			m.msgs = append([]*domain.Message{msg}, m.msgs...)
 			m.chatVp.SetContent(m.renderChatViewport())
 			m.chatVp.GotoBottom()
-			// set it as read also | nil check, if the terminal focus is not supported, just set the msg as read
+			// set it as read also | nil checks, if the terminal focus is not supported, just set the msg as read
 			if msg.SenderID == selUserID && msg.ReadAt == nil && (terminalFocus == nil || *terminalFocus) {
 				t := time.Now()
 				msg.ReadAt = &t
-				m.setMsgAsRead(msg)
+				return m, tea.Batch(m.setMsgAsRead(msg), m.listenForMessages())
 			}
 
 		case domain.UpdateMsg:
@@ -291,12 +299,13 @@ func (m ChatViewportModel) Update(msg tea.Msg) (ChatViewportModel, tea.Cmd) {
 					break
 				}
 			}
-		default:
 		}
 
-		return m, tea.Batch(m.handleChatViewportUpdate(msg), m.handleMsgDialogViewportUpdate(msg), m.listenForMessages(), cmd)
+		return m, tea.Batch(m.handleChatViewportUpdate(msg), m.handleMsgDialogViewportUpdate(msg), m.listenForMessages())
 
-	case SentMsg: // the message we'll send gets here once delivered successfully
+	case msgSetAsReadSuccessMsg:
+
+	case SentMsg: // the message we'll send gets here
 		m.msgs = append([]*domain.Message{msg}, m.msgs...)
 		m.chatVp.SetContent(m.renderChatViewport())
 		m.chatVp.LineDown(3) // GotoBottom does not work here as intended
@@ -315,6 +324,10 @@ func (m ChatViewportModel) Update(msg tea.Msg) (ChatViewportModel, tea.Cmd) {
 		} else {
 			m.chatVp.LineDown(max(0, prevLineCount-currLineCount))
 		}
+
+	case clearConvoSuccess:
+		m.msgs = make([]*domain.Message, 0)
+		m.chatVp.SetContent("")
 
 	case timer.TickMsg:
 		if m.recvTypingTimer.ID() == msg.ID {
@@ -358,10 +371,6 @@ func (m *ChatViewportModel) renderChatViewport() string {
 	cb := chatBubbleContainer.Width(chatWidth() - chatBubbleContainer.GetHorizontalFrameSize())
 	for i := len(m.msgs) - 1; i >= 0; i-- {
 		msg := m.msgs[i]
-		// TODO: Handle this, a rare edge case
-		/*if msg.SentAt == nil {
-			return ""
-		}*/
 		if msg.SentAt.Day() != prevMsgDay {
 			prevMsgDay = msg.SentAt.Day()
 			s := lipgloss.NewStyle().
@@ -494,16 +503,8 @@ func (m *ChatViewportModel) getSelMsgFromMsgSlice() *domain.Message {
 
 func (m *ChatViewportModel) renderBubbleWithStatusInfo(msg *domain.Message) string {
 	txtWidth := min(chatWidth()-20, lipgloss.Width(msg.Body)+2)
-	bubbleStyle := chatBubbleLStyle.Width(txtWidth)
-	// if prev msg sender is the same as current msg sender, do not show the protruding edge
-	if m.prevRenderedMsg != nil &&
-		m.prevRenderedMsg.SenderID == msg.SenderID &&
-		m.prevRenderedMsg.SentAt.Day() == msg.SentAt.Day() {
-		bubbleStyle = bubbleStyle.BorderStyle(lipgloss.RoundedBorder())
-	}
-	bubble := bubbleStyle.Render(msg.Body)
+	bubble := chatBubbleLStyle.Width(txtWidth).Render(msg.Body)
 	sentAt := lipgloss.NewStyle().Faint(true).Foreground(whiteColor).SetString(msg.SentAt.Format(time.Kitchen))
-
 	var status string
 	if msg.SentAt != nil {
 		status = "⁎"
@@ -517,22 +518,12 @@ func (m *ChatViewportModel) renderBubbleWithStatusInfo(msg *domain.Message) stri
 	status = lipgloss.NewStyle().Faint(true).Foreground(primaryColor).Render(status)
 
 	if msg.SenderID == m.client.CurrentUsr.ID {
-		bubbleStyle = chatBubbleRStyle.Width(txtWidth)
-		if m.prevRenderedMsg != nil &&
-			m.prevRenderedMsg.SenderID == msg.SenderID &&
-			m.prevRenderedMsg.SentAt.Day() == msg.SentAt.Day() {
-			bubbleStyle = bubbleStyle.BorderStyle(lipgloss.RoundedBorder())
-		}
-		// set the prevRenderedMsg to current msg senderId, once we are done with its use
-		m.prevRenderedMsg = msg
-		bubble = bubbleStyle.Render(msg.Body)
+		bubble = chatBubbleRStyle.Width(txtWidth).Render(msg.Body)
 		// mark the msg with zone on the right side so we can pick these up using mouse clicks
 		bubble = zone.Mark(msg.ID, bubble)
 		sentAt = sentAt.Foreground(primaryColor)
 		return lipgloss.JoinHorizontal(lipgloss.Center, status, " ", sentAt.Render(), " ", bubble)
 	}
-	// set the prevRenderedMsg to current msg senderId, once we are done with its use
-	m.prevRenderedMsg = msg
 	// mark the msg with zone on the left side so we can pick these up using mouse clicks
 	bubble = zone.Mark(msg.ID, bubble)
 	return lipgloss.JoinHorizontal(lipgloss.Center, bubble, " ", sentAt.Render())
@@ -602,10 +593,12 @@ func (m *ChatViewportModel) updateMsgInMsgs(msg *domain.Message) {
 	}
 }
 
-func (m ChatViewportModel) setMsgAsRead(msg *domain.Message) {
-	m.client.BT.Run(func(shtdwnCtx context.Context) {
-		_ = m.client.SetMsgAsRead(msg) // ignore as we can retry
-	})
+func (m ChatViewportModel) setMsgAsRead(msg *domain.Message) tea.Cmd {
+	return func() tea.Msg {
+		// ignore the error
+		_ = m.client.SetMsgAsRead(msg)
+		return nil
+	}
 }
 
 // once the message is deleted, this deletes it from the msg slice, if not exists -> NOOP

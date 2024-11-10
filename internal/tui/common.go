@@ -44,6 +44,8 @@ type SentMsg *domain.Message
 
 type echoTypingMsg struct{}
 
+type msgSetAsReadSuccessMsg struct{}
+
 func echoTypingCmd() tea.Cmd {
 	return func() tea.Msg {
 		t := time.NewTimer(2 * time.Second)
@@ -54,4 +56,10 @@ func echoTypingCmd() tea.Cmd {
 
 type deleteMsgSuccess string // stores id of the deleted msg, remove msg with this id from the msgs slice
 
+type clearConvoSuccess struct{}
+
 type createdConvoMsg *domain.Conversation
+
+type gotoFirstMsgMsg struct{}
+
+func gotoFirstMsgCmd() tea.Msg { return gotoFirstMsgMsg{} }

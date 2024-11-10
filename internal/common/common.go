@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"runtime/debug"
-	"strconv"
 	"sync"
 	"time"
 )
@@ -60,8 +59,7 @@ func (bt *BackgroundTask) Shutdown(timeout time.Duration) error {
 	case <-wait:
 		return nil
 	case <-time.After(timeout):
-		slog.Error(strconv.Itoa(bt.Tasks))
-		return fmt.Errorf("shutdown timeout, some background tasks may not have finished")
+		return fmt.Errorf("shutdown timeout, some background tasks may not have finished, \"count\"=%v", bt.Tasks)
 	}
 }
 

@@ -95,6 +95,15 @@ func (r LocalMessageRepository) DeleteMsg(id string) error {
 	return err
 }
 
+func (r LocalMessageRepository) DeleteAllForSenderAndReceiver(senderId, receiverId string) error {
+	query := `
+		DELETE FROM message 
+        WHERE (sender_id = $1 AND receiver_id = $2) OR (sender_id = $2 AND receiver_id = $1)
+	`
+	_, err := r.db.Exec(query, senderId, receiverId)
+	return err
+}
+
 func (r LocalMessageRepository) GetMsgsAsPage(
 	sen string,
 	fil domain.Filter,

@@ -41,9 +41,14 @@ func (s *MessageService) ProcessSentMessages(ctx context.Context, m *domain.Mess
 	case domain.CreateMsg:
 		return s.messageRepo.InsertMessage(ctx, m)
 	case domain.UpdateMsg:
-		msg, err := s.messageRepo.GetByID(ctx, m.ID)
-		if err != nil {
-			return err
+		var msg *domain.Message
+		var err error
+		for i := range 5 { // the msg may not be there, due to delete and updates
+			msg, err = s.messageRepo.GetByID(ctx, m.ID)
+			if i == 4 && err != nil {
+				return fmt.Errorf("get by id, while updating msg, id=\"%v\" %v", m.ID, err)
+			}
+			break
 		}
 		if m.DeliveredAt != nil {
 			msg.DeliveredAt = m.DeliveredAt
