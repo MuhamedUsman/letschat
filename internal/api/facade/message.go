@@ -65,7 +65,9 @@ func (f *MessageFacade) processMessage(ctx context.Context, msg *domain.Message)
 	f.bgTask.Run(func(context.Context) {
 		var err error
 		for range 5 { // retries 5 times
-			err = f.service.ProcessSentMessages(ctx, msg)
+			err = f.txManager.RunInTX(ctx, func(ctx context.Context) error {
+				return f.service.ProcessSentMessages(ctx, msg)
+			})
 			if err == nil {
 				break
 			}

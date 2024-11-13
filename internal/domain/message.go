@@ -10,15 +10,30 @@ import (
 type MsgOperation int
 
 const (
+	// CreateMsg indicates the sender has sent a new msg
 	CreateMsg MsgOperation = iota
-	UpdateMsg
+	// DeliveredMsg indicates the receiver has received the msg
+	DeliveredMsg
+	// DeliveredConfirmMsg indicates the sender's acknowledgment for the msg delivery
+	DeliveredConfirmMsg
+	// ReadMsg indicates the receiver has read the msg
+	ReadMsg
+	// ReadConfirmMsg indicates the sender's acknowledgment for the msg seen
+	ReadConfirmMsg
+	// DeleteMsg indicates the sender has deleted this msg
 	DeleteMsg
-	UserOnlineMsg
-	UserOfflineMsg
-	UserTypingMsg
+	// DeleteConfirmMsg indicates the receiver's acknowledgment of the deleted message;
+	// the receiving side will delete the msg, before sending this confirmation
+	DeleteConfirmMsg
+	// OnlineMsg indicates the user is online; a msg with this OP must not be persisted
+	OnlineMsg
+	// OfflineMsg indicates the user is offline; a msg with this OP must not be persisted
+	OfflineMsg
+	// TypingMsg indicates the user is typing; a msg with this OP must not be persisted
+	TypingMsg
 )
 
-// Confirmation only be used on frontend side
+// Confirmation only be used on the frontend side
 type Confirmation int
 
 const (
@@ -31,16 +46,16 @@ var (
 )
 
 type Message struct {
-	ID           string       `json:"id,omitempty"`
-	SenderID     string       `json:"senderID,omitempty"    db:"sender_id"`
-	ReceiverID   string       `json:"receiverID,omitempty"  db:"receiver_id"`
-	Body         string       `json:"body,omitempty"`
-	SentAt       *time.Time   `json:"sentAt,omitempty"      db:"sent_at"`
-	DeliveredAt  *time.Time   `json:"deliveredAt,omitempty" db:"delivered_at"`
-	ReadAt       *time.Time   `json:"readAt,omitempty"      db:"read_at"`
-	Confirmation Confirmation `json:"-"`
-	Version      int          `json:"-"`
-	Operation    MsgOperation `json:"operation"`
+	ID         string     `json:"id,omitempty"`
+	SenderID   string     `json:"senderID,omitempty"    db:"sender_id"`
+	ReceiverID string     `json:"receiverID,omitempty"  db:"receiver_id"`
+	Body       string     `json:"body,omitempty"`
+	SentAt     *time.Time `json:"sent_at,omitempty"      db:"sent_at"`
+	// used on the frontend side
+	DeliveredAt, ReadAt *time.Time
+	Confirmation        Confirmation `json:"-"`
+	Version             int          `json:"-"`
+	Operation           MsgOperation `json:"operation"             db:"operation"`
 }
 
 type MsgChan chan *Message
@@ -51,29 +66,27 @@ type MessageService interface {
 	GetUnDeliveredMessages(ctx context.Context, c MsgChan) error
 	GetMessagesAsPage(ctx context.Context, c MsgChan, filter *Filter) (*Metadata, error)
 	SaveMessage(ctx context.Context, m *Message) error
-	UpdateMessage(ctx context.Context, m *Message) error
-	DeleteMessage(ctx context.Context, mID string) error
+	//UpdateMessage(ctx context.Context, m *Message) error
+	//DeleteMessage(ctx context.Context, mID string) error
 }
 
 type MessageRepository interface {
-	GetByID(ctx context.Context, id string) (*Message, error)
-	GetUnDeliveredMessages(ctx context.Context, rcvrID string, c MsgChan) error
+	GetByID(ctx context.Context, id string, op MsgOperation) (*Message, error)
+	GetUnDeliveredMessages(ctx context.Context, rcvrID string, op MsgOperation, c MsgChan) error
 	GetMessagesAsPage(ctx context.Context, rcvrID string, c MsgChan, filter *Filter) (*Metadata, error)
 	InsertMessage(ctx context.Context, m *Message) error
-	UpdateMessage(ctx context.Context, m *Message) error
 	DeleteMessage(ctx context.Context, mID string) error
+	DeleteMessageWithOperation(ctx context.Context, mID string, op MsgOperation) error
 }
 
 // DTO
 
 type MessageSent struct {
-	ID          *string      `json:"id"`
-	ReceiverID  string       `json:"receiverID"`
-	Body        *string      `json:"body"`
-	SentAt      *time.Time   `json:"sentAt"`
-	DeliveredAt *time.Time   `json:"deliveredAt"`
-	ReadAt      *time.Time   `json:"readAt"`
-	Operation   MsgOperation `json:"operation"`
+	ID         *string      `json:"id"`
+	ReceiverID string       `json:"receiverID"`
+	Body       *string      `json:"body"`
+	SentAt     *time.Time   `json:"sent_at"`
+	Operation  MsgOperation `json:"operation"`
 }
 
 type LatestMsgBody struct {
@@ -81,27 +94,8 @@ type LatestMsgBody struct {
 	SentAt *time.Time `db:"sent_at"`
 }
 
+// TODO: Update this logic
 func (m MessageSent) ValidateMessageSent() *ErrValidation {
-	ev := NewErrValidation()
-	ValidateMessageRcvrID(m.ReceiverID, ev)
-	if m.Operation == CreateMsg {
-		ValidateMessageBody(*m.Body, ev)
-		ev.Evaluate(m.SentAt != nil, "sentAt", "required for 0(CreateMsg) operation")
-	}
-	if m.Operation == UpdateMsg {
-		ev.Evaluate(m.Body == nil, "body", "nil required for 1(UpdateMsg) operation)")
-		ev.Evaluate(m.ID != nil, "id", "required for 1(UpdateMsg) operation")
-		if m.DeliveredAt == nil && m.ReadAt == nil {
-			ev.AddError("deliveredAt", "(Optional) required to 1(UpdateMsg)")
-			ev.AddError("readAt", "(Optional) required to 1(UpdateMsg)")
-		}
-	}
-	if m.Operation == DeleteMsg && m.ID == nil {
-		ev.AddError("id", "required for 2(DeleteMsg) operation")
-	}
-	if ev.HasErrors() {
-		return ev
-	}
 	return nil
 }
 

@@ -52,8 +52,6 @@ func (s *Server) WebsocketSubscribeHandler(w http.ResponseWriter, r *http.Reques
 		errChan <- s.handleSentMessages(shtdwnCtx, reqCtx, conn)
 	})
 
-	// this writes to the chan that is read by handleReceivedMessages func so it must be called afterward
-
 	if err = s.Facade.WriteUnDeliveredMessagesToWSConn(r.Context(), u.Messages); err != nil {
 		slog.Error(err.Error())
 		return
@@ -191,9 +189,9 @@ func (s *Server) broadcastUserOnlineStatus(ctx context.Context, u *domain.User, 
 			continue
 		}
 		t := time.Now()
-		op := domain.UserOfflineMsg
+		op := domain.OfflineMsg
 		if online {
-			op = domain.UserOnlineMsg
+			op = domain.OnlineMsg
 		}
 		msg := domain.Message{
 			SenderID:  u.ID,
