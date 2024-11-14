@@ -83,8 +83,9 @@ func (s *MessageService) ProcessSentMessages(ctx context.Context, m *domain.Mess
 func (s *MessageService) GetUnDeliveredMessages(ctx context.Context, c domain.MsgChan) error {
 	u := utility.ContextGetUser(ctx)
 	// the order matters here
-	ops := []domain.MsgOperation{domain.DeleteMsg, domain.CreateMsg, domain.DeliveredMsg, domain.ReadMsg}
+	ops := []domain.MsgOperation{domain.DeleteMsg, domain.DeliveredMsg, domain.ReadMsg, domain.CreateMsg}
 	for _, op := range ops {
+		// this directly writes to the msg chan
 		if err := s.messageRepo.GetUnDeliveredMessages(ctx, u.ID, op, c); err != nil {
 			return err
 		}
@@ -104,12 +105,3 @@ func (s *MessageService) GetMessagesAsPage(
 func (s *MessageService) SaveMessage(ctx context.Context, m *domain.Message) error {
 	return s.messageRepo.InsertMessage(ctx, m)
 }
-
-/*func (s *MessageService) UpdateMessage(ctx context.Context, m *domain.Message) error {
-	msg, err := s.messageRepo.GetByID(ctx, m.ID, domain.CreateMsg)
-	if err != nil {
-		return err
-	}
-	m.Version = msg.Version
-	return s.messageRepo.UpdateMessage(ctx, m)
-}*/
