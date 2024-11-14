@@ -7,7 +7,6 @@ import (
 	"github.com/M0hammadUsman/letschat/internal/domain"
 	"github.com/M0hammadUsman/letschat/internal/sync"
 	"log/slog"
-	"math"
 	"time"
 )
 
@@ -48,8 +47,6 @@ func (c *Client) SendMessage(msg domain.Message) error {
 	if err := c.repo.SaveMsg(&msg); err != nil {
 		slog.Error(err.Error())
 	}
-	msg.Operation = math.MinInt8 // so we don't have a redundant operation somewhere
-	c.RecvMsgs.Write(&msg)
 	convos, _ := c.repo.GetConversations()
 	c.populateConvosWithLatestMsgs(convos)
 	_ = c.repo.DeleteAllConversations()
@@ -143,6 +140,8 @@ func (c *Client) handleReceivedMsgs(shtdwnCtx context.Context) {
 				for range 5 { // retries for 5 times, in case there is domain.ErrEditConflict
 					if err = c.repo.UpdateMsg(msgToUpdate); err == nil {
 						break
+					} else {
+						slog.Error(err.Error())
 					}
 				}
 				// echo back read confirmation
@@ -201,6 +200,7 @@ func (c *Client) setMsgAsDelivered(msgID, receiverID string) error {
 	for i := range 5 { // this can yield domain.ErrEditConflict so, retry
 		msgToUpdate, err := c.repo.GetMsgByID(msgID)
 		if err != nil {
+			slog.Error(err.Error())
 			return err
 		}
 		if msgToUpdate.ID == msg.ID {
@@ -233,6 +233,7 @@ func (c *Client) SetMsgAsRead(msg *domain.Message) error {
 		for i := range 5 {
 			msgToUpdate, err := c.repo.GetMsgByID(msg.ID)
 			if err != nil {
+				slog.Error(err.Error())
 				return err
 			}
 			msgToUpdate.ReadAt = msg.ReadAt
@@ -255,6 +256,7 @@ func (c *Client) SetMsgAsRead(msg *domain.Message) error {
 		msgToUpdate.ReadAt = msg.ReadAt
 		msgToUpdate.Confirmation = domain.MsgReadConfirmed
 		if err = c.repo.UpdateMsg(msgToUpdate); err != nil {
+			slog.Error(err.Error())
 			if i == 4 {
 				return err
 			}

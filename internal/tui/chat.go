@@ -103,7 +103,7 @@ func (m ChatModel) Update(msg tea.Msg) (ChatModel, tea.Cmd) {
 				m.menuBtnIdx = -1
 			case 1:
 				m.menuBtnIdx = -1
-				return m, m.deleteAllMsgsForConvo()
+				return m, m.deleteAllMsgsForConvo(m.client.CurrentUsr.ID, selUserID)
 			}
 		}
 
@@ -344,9 +344,9 @@ func (m *ChatModel) sendTypingStatus() tea.Cmd {
 	}
 }
 
-func (m ChatModel) deleteAllMsgsForConvo() tea.Cmd {
+func (m ChatModel) deleteAllMsgsForConvo(currUsrId, selUsrId string) tea.Cmd {
 	return func() tea.Msg {
-		if err := m.client.DeleteForMeAllMsgsForConversation(m.client.CurrentUsr.ID, selUserID); err != nil {
+		if err := m.client.DeleteForMeAllMsgsForConversation(currUsrId, selUsrId); err != nil {
 			return &errMsg{
 				err:  "Unable to clear conversation",
 				code: 0,

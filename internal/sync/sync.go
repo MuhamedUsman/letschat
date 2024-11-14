@@ -66,7 +66,7 @@ func (b *Broadcaster[T]) Broadcast(shtdwnCtx context.Context) {
 			b.mu.RLock() // reading from the map and writing to what we'll read, that's why RLock
 			for _, ch := range b.out {
 				// this may block, but we want one on one synchronization
-				// if it blocks indefinitely, there is problem elsewhere in the code
+				// if it blocks indefinitely, there is a problem elsewhere in the code
 				ch <- v
 			}
 			b.mu.RUnlock()

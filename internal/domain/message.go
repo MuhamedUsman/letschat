@@ -14,16 +14,19 @@ const (
 	CreateMsg MsgOperation = iota
 	// DeliveredMsg indicates the receiver has received the msg
 	DeliveredMsg
-	// DeliveredConfirmMsg indicates the sender's acknowledgment for the msg delivery
+	// DeliveredConfirmMsg indicates the sender's acknowledgment for the msg delivery.
+	// not to be persisted
 	DeliveredConfirmMsg
 	// ReadMsg indicates the receiver has read the msg
 	ReadMsg
-	// ReadConfirmMsg indicates the sender's acknowledgment for the msg seen
+	// ReadConfirmMsg indicates the sender's acknowledgment, for the msg seen.
+	// not to be persisted
 	ReadConfirmMsg
 	// DeleteMsg indicates the sender has deleted this msg
 	DeleteMsg
 	// DeleteConfirmMsg indicates the receiver's acknowledgment of the deleted message;
-	// the receiving side will delete the msg, before sending this confirmation
+	// the receiving side will delete the msg, before sending this confirmation.
+	// not to be persisted
 	DeleteConfirmMsg
 	// OnlineMsg indicates the user is online; a msg with this OP must not be persisted
 	OnlineMsg

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"github.com/M0hammadUsman/letschat/internal/domain"
+	"log"
 )
 
 type LocalMessageRepository struct {
@@ -100,7 +101,8 @@ func (r LocalMessageRepository) DeleteAllForSenderAndReceiver(senderId, receiver
 		DELETE FROM message 
         WHERE (sender_id = $1 AND receiver_id = $2) OR (sender_id = $2 AND receiver_id = $1)
 	`
-	_, err := r.db.Exec(query, senderId, receiverId)
+	res, err := r.db.Exec(query, senderId, receiverId)
+	log.Println(res)
 	return err
 }
 
