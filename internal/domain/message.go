@@ -47,15 +47,16 @@ var (
 
 type Message struct {
 	ID         string     `json:"id,omitempty"`
-	SenderID   string     `json:"senderID,omitempty"    db:"sender_id"`
-	ReceiverID string     `json:"receiverID,omitempty"  db:"receiver_id"`
+	SenderID   string     `json:"senderID,omitempty"   db:"sender_id"`
+	ReceiverID string     `json:"receiverID,omitempty" db:"receiver_id"`
 	Body       string     `json:"body,omitempty"`
-	SentAt     *time.Time `json:"sent_at,omitempty"      db:"sent_at"`
+	SentAt     *time.Time `json:"sent_at,omitempty"    db:"sent_at"`
 	// used on the frontend side
-	DeliveredAt, ReadAt *time.Time
-	Confirmation        Confirmation `json:"-"`
-	Version             int          `json:"-"`
-	Operation           MsgOperation `json:"operation"             db:"operation"`
+	DeliveredAt  *time.Time   `db:"delivered_at"`
+	ReadAt       *time.Time   `db:"read_at"`
+	Confirmation Confirmation `json:"-"`
+	Version      int          `json:"-"`
+	Operation    MsgOperation `json:"operation"        db:"operation"`
 }
 
 type MsgChan chan *Message

@@ -308,13 +308,12 @@ func (m *ChatModel) updateChatTxtareaAndViewportDimensions() {
 func (m *ChatModel) sendMessage(msg string) tea.Cmd {
 	t := time.Now()
 	msgToSnd := domain.Message{
-		ID:           uuid.New().String(),
-		SenderID:     m.client.CurrentUsr.ID,
-		ReceiverID:   selUserID,
-		Body:         msg,
-		SentAt:       &t,
-		Operation:    domain.CreateMsg,
-		Confirmation: 0,
+		ID:         uuid.New().String(),
+		SenderID:   m.client.CurrentUsr.ID,
+		ReceiverID: selUserID,
+		Body:       msg,
+		SentAt:     &t,
+		Operation:  domain.CreateMsg,
 	}
 	return func() tea.Msg {
 		if m.client.WsConnState.Get() != client.Connected {
@@ -336,7 +335,7 @@ func (m *ChatModel) sendTypingStatus() tea.Cmd {
 		SenderID:     m.client.CurrentUsr.ID,
 		ReceiverID:   selUserID,
 		SentAt:       &t,
-		Operation:    domain.UserTypingMsg,
+		Operation:    domain.TypingMsg,
 		Confirmation: 0,
 	}
 	return func() tea.Msg {

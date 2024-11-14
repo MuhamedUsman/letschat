@@ -17,7 +17,7 @@ func main() {
 	flag.IntVar(&key, "usr", 1, "User to login for testing")
 	flag.Parse()
 	slogger := slog.New(tint.NewHandler(os.Stderr, nil))
-	// using it as initialization if err occurs we halt the application on startup rather than having issues while the
+	// using it as initialization, if err occurs, we halt the application on startup rather than having issues while the
 	// app is running
 	if err := client.Init(key); err != nil {
 		slogger.Error(err.Error())

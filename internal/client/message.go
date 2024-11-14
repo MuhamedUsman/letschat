@@ -27,10 +27,10 @@ func newRecvMsgsBroadcaster() *RecvMsgsBroadcaster {
 	return sync.NewBroadcaster[*domain.Message]()
 }
 
-func (c *Client) SendMessage(msg domain.Message) {
+func (c *Client) SendMessage(msg domain.Message) error {
 	c.sentMsgs.msgs <- &msg // this will send the msg
 	// if it's not sent save it to db without the sentAt field
-	// then, once we establish the conn back, we'll retry those
+	// then, once we establish the connection back, we'll retry those
 	if !<-c.sentMsgs.done {
 		msg.SentAt = nil
 		if err := c.repo.SaveMsg(&msg); err != nil {
@@ -42,10 +42,9 @@ func (c *Client) SendMessage(msg domain.Message) {
 		_ = c.repo.DeleteAllConversations()
 		_ = c.repo.SaveConversations(convos...)
 		c.Conversations.Write(convos)
+		return fmt.Errorf("unable to sent message")
 	}
 	// if sent save with sentAt field
-	// and write it back to chan with sent state, so tui can update accordingly
-	msg.Confirmation = domain.MsgDeliveredConfirmed
 	if err := c.repo.SaveMsg(&msg); err != nil {
 		slog.Error(err.Error())
 	}
@@ -56,6 +55,7 @@ func (c *Client) SendMessage(msg domain.Message) {
 	_ = c.repo.DeleteAllConversations()
 	_ = c.repo.SaveConversations(convos...)
 	c.Conversations.Write(convos)
+	return nil
 }
 
 func (c *Client) SendTypingStatus(msg domain.Message) {
@@ -108,32 +108,74 @@ func (c *Client) handleReceivedMsgs(shtdwnCtx context.Context) {
 				}
 				c.getPopulateSaveConvosAndWriteToChan()
 
-			case domain.UpdateMsg:
+			case domain.DeliveredMsg:
 				msgToUpdate, err := c.repo.GetMsgByID(msg.ID)
 				if err != nil { // we've not found the msg in the user's local repo so there is noting to update
 					continue
 				}
-				if msg.DeliveredAt != nil {
-					msgToUpdate.DeliveredAt = msg.DeliveredAt
-				}
-				if msg.ReadAt != nil {
-					msgToUpdate.ReadAt = msg.ReadAt
+				if msg.SentAt != nil {
+					msgToUpdate.DeliveredAt = msg.SentAt
 				}
 				for range 5 { // retries for 5 times, in case there is domain.ErrEditConflict
 					if err = c.repo.UpdateMsg(msgToUpdate); err == nil {
 						break
 					}
 				}
+				// echo back delivery confirmation
+				c.sentMsgs.msgs <- &domain.Message{
+					ID:         msg.ID,
+					SenderID:   client.CurrentUsr.ID,
+					ReceiverID: msg.SenderID,
+					Body:       "",
+					SentAt:     ptr(time.Now()),
+					Operation:  domain.DeliveredConfirmMsg,
+				}
+				_ = <-c.sentMsgs.done
+
+			case domain.ReadMsg:
+				msgToUpdate, err := c.repo.GetMsgByID(msg.ID)
+				if err != nil { // we've not found the msg in the user's local repo so there is noting to update
+					continue
+				}
+				if msg.SentAt != nil {
+					msgToUpdate.ReadAt = msg.SentAt
+				}
+				for range 5 { // retries for 5 times, in case there is domain.ErrEditConflict
+					if err = c.repo.UpdateMsg(msgToUpdate); err == nil {
+						break
+					}
+				}
+				// echo back read confirmation
+				c.sentMsgs.msgs <- &domain.Message{
+					ID:         msg.ID,
+					SenderID:   client.CurrentUsr.ID,
+					ReceiverID: msg.SenderID,
+					Body:       "",
+					SentAt:     ptr(time.Now()),
+					Operation:  domain.ReadConfirmMsg,
+				}
+				_ = <-c.sentMsgs.done
 
 			case domain.DeleteMsg:
 				_ = c.repo.DeleteMsg(msg.ID)
 				c.getPopulateSaveConvosAndWriteToChan()
+				// echo back with delete confirmation
+				c.sentMsgs.msgs <- &domain.Message{
+					ID:         msg.ID,
+					SenderID:   c.CurrentUsr.ID,
+					ReceiverID: msg.SenderID,
+					Body:       "",
+					SentAt:     ptr(time.Now()),
+					Operation:  domain.DeleteConfirmMsg,
+				}
+				_ = <-c.sentMsgs.done
 
-			case domain.UserOnlineMsg:
+			case domain.OnlineMsg:
 				c.setUsrOnlineStatus(msg, true)
 
-			case domain.UserOfflineMsg:
+			case domain.OfflineMsg:
 				c.setUsrOnlineStatus(msg, false)
+
 			}
 
 		case <-shtdwnCtx.Done():
@@ -142,16 +184,47 @@ func (c *Client) handleReceivedMsgs(shtdwnCtx context.Context) {
 	}
 }
 
+func (c *Client) setMsgAsDelivered(msgID, receiverID string) error {
+	msg := &domain.Message{
+		ID:         msgID,
+		SenderID:   c.CurrentUsr.ID,
+		ReceiverID: receiverID,
+		SentAt:     ptr(time.Now()),
+		Operation:  domain.DeliveredMsg,
+	}
+	c.sentMsgs.msgs <- msg
+	// if msg is not sent
+	if !<-c.sentMsgs.done {
+		return ErrMsgNotSent
+	}
+	// update in local DB
+	for i := range 5 { // this can yield domain.ErrEditConflict so, retry
+		msgToUpdate, err := c.repo.GetMsgByID(msgID)
+		if err != nil {
+			return err
+		}
+		if msgToUpdate.ID == msg.ID {
+			msgToUpdate.DeliveredAt = msg.SentAt
+		}
+		msg.Confirmation = domain.MsgDeliveredConfirmed
+		if err = c.repo.UpdateMsg(msgToUpdate); err != nil {
+			if i == 4 {
+				return err
+			}
+		} else {
+			break
+		}
+	}
+	return nil
+}
+
 func (c *Client) SetMsgAsRead(msg *domain.Message) error {
 	msgToSend := &domain.Message{
 		ID:         msg.ID,
 		SenderID:   c.CurrentUsr.ID,
 		ReceiverID: msg.SenderID, // confirm that message is read
-		ReadAt:     msg.ReadAt,   // if provided, use that
-		Operation:  domain.UpdateMsg,
-	}
-	if msgToSend.ReadAt == nil {
-		msgToSend.ReadAt = ptr(time.Now())
+		SentAt:     msg.ReadAt,
+		Operation:  domain.ReadMsg,
 	}
 	// this may block, in theory, depends on the connection
 	c.sentMsgs.msgs <- msgToSend
@@ -226,40 +299,6 @@ func (c *Client) DeleteForMeAllMsgsForConversation(senderId, receiverId string) 
 
 // Helpers & Stuff -----------------------------------------------------------------------------------------------------
 
-func (c *Client) setMsgAsDelivered(msgID, receiverID string) error {
-	msg := &domain.Message{
-		ID:          msgID,
-		SenderID:    c.CurrentUsr.ID,
-		ReceiverID:  receiverID,
-		DeliveredAt: ptr(time.Now()),
-		Operation:   domain.UpdateMsg,
-	}
-	c.sentMsgs.msgs <- msg
-	// if msg is not sent
-	if !<-c.sentMsgs.done {
-		return ErrMsgNotSent
-	}
-	// update in local DB
-	for i := range 5 { // this can yield domain.ErrEditConflict so, retry
-		msgToUpdate, err := c.repo.GetMsgByID(msgID)
-		if err != nil {
-			return err
-		}
-		if msgToUpdate.ID == msg.ID {
-			msgToUpdate.DeliveredAt = msg.DeliveredAt
-		}
-		msg.Confirmation = domain.MsgDeliveredConfirmed
-		if err = c.repo.UpdateMsg(msgToUpdate); err != nil {
-			if i == 4 {
-				return err
-			}
-		} else {
-			break
-		}
-	}
-	return nil
-}
-
 func (c *Client) setUsrOnlineStatus(msg *domain.Message, online bool) {
 	convos := c.Conversations.Get()
 	lastOnline := msg.SentAt
@@ -284,7 +323,7 @@ func (c *Client) isValidReadUpdate(msg *domain.Message) bool {
 	return msg.SenderID != c.CurrentUsr.ID && msg.DeliveredAt != nil && msg.Confirmation != domain.MsgReadConfirmed
 }
 
-// once there is a message we also update the conversations as the latest msg will also need update and save to db
+// once there is a message, we also update the conversations as the latest msg will also need update and save to db
 func (c *Client) getPopulateSaveConvosAndWriteToChan() {
 	convos := c.Conversations.Get()
 	c.populateConvosWithLatestMsgs(convos)

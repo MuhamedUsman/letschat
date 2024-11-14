@@ -258,7 +258,7 @@ func (m ChatViewportModel) Update(msg tea.Msg) (ChatViewportModel, tea.Cmd) {
 				return m, tea.Batch(m.setMsgAsRead(msg), m.listenForMessages())
 			}
 
-		case domain.UpdateMsg:
+		case domain.DeliveredMsg, domain.ReadMsg:
 			m.updateMsgInMsgs(msg)
 			// the above op will update the msgs so we need to rerender
 			if m.selMsgId != nil {
@@ -285,7 +285,7 @@ func (m ChatViewportModel) Update(msg tea.Msg) (ChatViewportModel, tea.Cmd) {
 				m.chatVp.LineDown(max(0, prevLineCount-currLineCount))
 			}
 
-		case domain.UserTypingMsg:
+		case domain.TypingMsg:
 			selUserTyping = true
 		default:
 		}
@@ -581,11 +581,11 @@ func (m ChatViewportModel) getMsgAsPage(p int) tea.Cmd {
 func (m *ChatViewportModel) updateMsgInMsgs(msg *domain.Message) {
 	for i, imsg := range m.msgs {
 		if imsg.ID == msg.ID {
-			if msg.DeliveredAt != nil {
-				imsg.DeliveredAt = msg.DeliveredAt
-			}
-			if msg.ReadAt != nil {
-				imsg.ReadAt = msg.ReadAt
+			switch msg.Operation {
+			case domain.DeliveredMsg:
+				imsg.DeliveredAt = msg.SentAt
+			case domain.ReadMsg:
+				imsg.ReadAt = msg.SentAt
 			}
 			m.msgs[i] = imsg
 			break

@@ -71,14 +71,8 @@ func (s *MessageService) ProcessSentMessages(ctx context.Context, m *domain.Mess
 	case domain.DeleteConfirmMsg:
 		return s.messageRepo.DeleteMessageWithOperation(ctx, m.ID, domain.DeleteMsg)
 
-	// the last three cases will be processed directly if the appropriate party(sender/receiver) is online
-	case domain.OnlineMsg:
-		return nil
-
-	case domain.OfflineMsg:
-		return nil
-
-	case domain.TypingMsg:
+	// these cases will be processed directly if the appropriate party(sender/receiver) is online
+	case domain.OnlineMsg, domain.OfflineMsg, domain.TypingMsg:
 		return nil
 
 	default:

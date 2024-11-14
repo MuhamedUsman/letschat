@@ -153,6 +153,12 @@ func (s *Server) handleSentMessages(shutdownCtx, reqCtx context.Context, conn *w
 			continue
 		}
 		if relayTo, ok := s.Subscribers[ms.ReceiverID]; ok {
+			// we do not want to send msg, these Ops are only for ack to server
+			if msg.Operation == domain.DeliveredConfirmMsg ||
+				msg.Operation == domain.ReadConfirmMsg ||
+				msg.Operation == domain.DeleteConfirmMsg {
+				continue
+			}
 			select {
 			case relayTo.Messages <- msg:
 			case <-shutdownCtx.Done():
