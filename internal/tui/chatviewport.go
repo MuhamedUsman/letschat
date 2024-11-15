@@ -583,9 +583,9 @@ func (m *ChatViewportModel) updateMsgInMsgs(msg *domain.Message) {
 		if imsg.ID == msg.ID {
 			switch msg.Operation {
 			case domain.DeliveredMsg:
-				imsg.DeliveredAt = msg.SentAt
+				imsg.DeliveredAt = msg.DeliveredAt
 			case domain.ReadMsg:
-				imsg.ReadAt = msg.SentAt
+				imsg.ReadAt = msg.ReadAt
 			}
 			m.msgs[i] = imsg
 			break

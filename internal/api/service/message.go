@@ -18,10 +18,12 @@ func NewMessageService(messageRepo domain.MessageRepository) *MessageService {
 
 func (*MessageService) PopulateMessage(m domain.MessageSent, sndr *domain.User) *domain.Message {
 	msg := &domain.Message{
-		SenderID:   sndr.ID,
-		ReceiverID: m.ReceiverID,
-		SentAt:     m.SentAt,
-		Operation:  m.Operation,
+		SenderID:    sndr.ID,
+		ReceiverID:  m.ReceiverID,
+		SentAt:      m.SentAt,
+		DeliveredAt: m.DeliveredAt,
+		ReadAt:      m.ReadAt,
+		Operation:   m.Operation,
 	}
 	if m.ID != nil {
 		msg.ID = *m.ID
@@ -46,6 +48,13 @@ func (s *MessageService) ProcessSentMessages(ctx context.Context, m *domain.Mess
 
 	// these OPs cases will delete msgs with specified Ops, CreateMsg, DeliveredMsg, Any Op
 	case domain.DeliveredMsg, domain.ReadMsg, domain.DeleteMsg:
+		if m.Operation == domain.ReadMsg {
+			msg, _ := s.messageRepo.GetByID(ctx, m.ID, domain.DeliveredMsg)
+			if msg != nil {
+				// if the sender is offline and the msg is delivered & read in that case, also persist deliveredAt field
+				m.DeliveredAt = msg.DeliveredAt
+			}
+		}
 		if err := s.messageRepo.DeleteMessage(ctx, m.ID); err != nil {
 			return err
 		}

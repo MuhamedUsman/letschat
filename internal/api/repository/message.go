@@ -98,14 +98,16 @@ func (r *MessageRepository) GetMessagesAsPage(
 
 func (r *MessageRepository) InsertMessage(ctx context.Context, m *domain.Message) error {
 	query := `
-		INSERT INTO message (id, sender_id, receiver_id, body, sent_at, operation) 
-		VALUES (:id, :sender_id, :receiver_id, :body, :sent_at, :operation)
+		INSERT INTO message (id, sender_id, receiver_id, body, sent_at, delivered_at, read_at, operation) 
+		VALUES (:id, :sender_id, :receiver_id, :body, :sent_at, :delivered_at, :read_at, :operation)
 		ON CONFLICT (id)
 		DO UPDATE SET
 		              sender_id = EXCLUDED.sender_id,
 		              receiver_id = EXCLUDED.receiver_id,
 		              body = EXCLUDED.body,
 		              sent_at = EXCLUDED.sent_at,
+		              delivered_at = EXCLUDED.delivered_at,
+		              read_at = EXCLUDED.read_at,
 		              operation = EXCLUDED.operation
 		`
 	if tx := contextGetTX(ctx); tx != nil {

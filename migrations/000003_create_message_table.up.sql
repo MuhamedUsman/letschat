@@ -3,7 +3,9 @@ CREATE TABLE IF NOT EXISTS message (
     sender_id UUID REFERENCES users,
     receiver_id UUID REFERENCES users,
     body TEXT NOT NULL,
-    timestamp TIMESTAMP(0) WITH TIME ZONE,
+    sent_at TIMESTAMP(0) WITH TIME ZONE,
+    delivered_at TIMESTAMP(0) WITH TIME ZONE,
+    read_at TIMESTAMP(0) WITH TIME ZONE,
     operation INT,
     version INT NOT NULL DEFAULT 1
 );

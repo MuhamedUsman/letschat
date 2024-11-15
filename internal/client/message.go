@@ -106,8 +106,7 @@ func (c *Client) handleReceivedMsgs(shtdwnCtx context.Context) {
 				c.getPopulateSaveConvosAndWriteToChan()
 
 			case domain.DeliveredMsg:
-				msg.DeliveredAt = msg.SentAt
-				if err := c.repo.UpdateMsg(msg); err == nil {
+				if err := c.repo.UpdateMsg(msg); err != nil {
 					slog.Error(err.Error())
 				}
 				// echo back delivery confirmation
@@ -124,8 +123,7 @@ func (c *Client) handleReceivedMsgs(shtdwnCtx context.Context) {
 				}
 
 			case domain.ReadMsg:
-				msg.ReadAt = msg.SentAt
-				if err := c.repo.UpdateMsg(msg); err == nil {
+				if err := c.repo.UpdateMsg(msg); err != nil {
 					slog.Error(err.Error())
 				}
 				// echo back read confirmation
@@ -173,11 +171,11 @@ func (c *Client) handleReceivedMsgs(shtdwnCtx context.Context) {
 
 func (c *Client) setMsgAsDelivered(msgID, receiverID string) error {
 	msg := &domain.Message{
-		ID:         msgID,
-		SenderID:   c.CurrentUsr.ID,
-		ReceiverID: receiverID,
-		SentAt:     ptr(time.Now()),
-		Operation:  domain.DeliveredMsg,
+		ID:          msgID,
+		SenderID:    c.CurrentUsr.ID,
+		ReceiverID:  receiverID,
+		DeliveredAt: ptr(time.Now()),
+		Operation:   domain.DeliveredMsg,
 	}
 	c.sentMsgs.msgs <- msg
 	// if msg is not sent
@@ -185,7 +183,6 @@ func (c *Client) setMsgAsDelivered(msgID, receiverID string) error {
 		return ErrMsgNotSent
 	}
 	// update in local DB
-	msg.DeliveredAt = msg.SentAt
 	msg.Confirmation = domain.MsgDeliveredConfirmed
 	if err := c.repo.UpdateMsg(msg); err != nil {
 		return err
@@ -198,7 +195,7 @@ func (c *Client) SetMsgAsRead(msg *domain.Message) error {
 		ID:         msg.ID,
 		SenderID:   c.CurrentUsr.ID,
 		ReceiverID: msg.SenderID, // confirm that message is read
-		SentAt:     msg.ReadAt,
+		ReadAt:     msg.ReadAt,
 		Operation:  domain.ReadMsg,
 	}
 	// this may block, in theory, depends on the connection

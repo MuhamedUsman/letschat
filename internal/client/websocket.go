@@ -94,6 +94,9 @@ func (c *Client) handleSentMessages(conn *websocket.Conn, shtdwnCtx context.Cont
 	for {
 		select {
 		case msg := <-msgChan:
+			if msg.Operation == domain.DeliveredMsg {
+				slog.Info("Sending Delivery Msg")
+			}
 			if err := writeWithTimeout(conn, 2*time.Second, msg); err != nil {
 				doneChan <- false
 				return err
