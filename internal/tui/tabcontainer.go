@@ -10,7 +10,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 	zone "github.com/lrstanley/bubblezone"
-	"log"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -83,12 +82,10 @@ func (m TabContainerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		terminalWidth = msg.Width
 
 	case tea.FocusMsg:
-		log.Println(msg)
 		flag := true
 		terminalFocus = &flag
 
 	case tea.BlurMsg:
-		log.Println(msg)
 		flag := false
 		terminalFocus = &flag
 

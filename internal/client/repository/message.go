@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"errors"
 	"github.com/M0hammadUsman/letschat/internal/domain"
-	"log"
 )
 
 type LocalMessageRepository struct {
@@ -74,8 +73,11 @@ func (r LocalMessageRepository) SaveMsg(msg *domain.Message) error {
 func (r LocalMessageRepository) UpdateMsg(msg *domain.Message) error {
 	query := `
 		UPDATE message 
-		SET delivered_at = :delivered_at, read_at = :read_at, confirmation = :confirmation, version = version + 1
-		WHERE id = :id AND version = :version
+		SET delivered_at = COALESCE(:delivered_at, delivered_at), 
+		    read_at = COALESCE(:read_at, read_at), 
+		    confirmation = COALESCE(:confirmation, confirmation), 
+		    version = version + 1
+		WHERE id = :id
 	`
 	res, err := r.db.NamedExec(query, msg)
 	if err != nil {
@@ -101,8 +103,7 @@ func (r LocalMessageRepository) DeleteAllForSenderAndReceiver(senderId, receiver
 		DELETE FROM message 
         WHERE (sender_id = $1 AND receiver_id = $2) OR (sender_id = $2 AND receiver_id = $1)
 	`
-	res, err := r.db.Exec(query, senderId, receiverId)
-	log.Println(res)
+	_, err := r.db.Exec(query, senderId, receiverId)
 	return err
 }
 

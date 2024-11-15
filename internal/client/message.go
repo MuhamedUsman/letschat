@@ -106,17 +106,9 @@ func (c *Client) handleReceivedMsgs(shtdwnCtx context.Context) {
 				c.getPopulateSaveConvosAndWriteToChan()
 
 			case domain.DeliveredMsg:
-				msgToUpdate, err := c.repo.GetMsgByID(msg.ID)
-				if err != nil { // we've not found the msg in the user's local repo so there is noting to update
-					continue
-				}
-				if msg.SentAt != nil {
-					msgToUpdate.DeliveredAt = msg.SentAt
-				}
-				for range 5 { // retries for 5 times, in case there is domain.ErrEditConflict
-					if err = c.repo.UpdateMsg(msgToUpdate); err == nil {
-						break
-					}
+				msg.DeliveredAt = msg.SentAt
+				if err := c.repo.UpdateMsg(msg); err == nil {
+					slog.Error(err.Error())
 				}
 				// echo back delivery confirmation
 				c.sentMsgs.msgs <- &domain.Message{
@@ -127,22 +119,14 @@ func (c *Client) handleReceivedMsgs(shtdwnCtx context.Context) {
 					SentAt:     ptr(time.Now()),
 					Operation:  domain.DeliveredConfirmMsg,
 				}
-				_ = <-c.sentMsgs.done
+				if !<-c.sentMsgs.done {
+					slog.Error("unable to echo back delivery confirmation")
+				}
 
 			case domain.ReadMsg:
-				msgToUpdate, err := c.repo.GetMsgByID(msg.ID)
-				if err != nil { // we've not found the msg in the user's local repo so there is noting to update
-					continue
-				}
-				if msg.SentAt != nil {
-					msgToUpdate.ReadAt = msg.SentAt
-				}
-				for range 5 { // retries for 5 times, in case there is domain.ErrEditConflict
-					if err = c.repo.UpdateMsg(msgToUpdate); err == nil {
-						break
-					} else {
-						slog.Error(err.Error())
-					}
+				msg.ReadAt = msg.SentAt
+				if err := c.repo.UpdateMsg(msg); err == nil {
+					slog.Error(err.Error())
 				}
 				// echo back read confirmation
 				c.sentMsgs.msgs <- &domain.Message{
@@ -153,7 +137,9 @@ func (c *Client) handleReceivedMsgs(shtdwnCtx context.Context) {
 					SentAt:     ptr(time.Now()),
 					Operation:  domain.ReadConfirmMsg,
 				}
-				_ = <-c.sentMsgs.done
+				if !<-c.sentMsgs.done {
+					slog.Error("unable to echo back read confirmation")
+				}
 
 			case domain.DeleteMsg:
 				_ = c.repo.DeleteMsg(msg.ID)
@@ -167,7 +153,9 @@ func (c *Client) handleReceivedMsgs(shtdwnCtx context.Context) {
 					SentAt:     ptr(time.Now()),
 					Operation:  domain.DeleteConfirmMsg,
 				}
-				_ = <-c.sentMsgs.done
+				if !<-c.sentMsgs.done {
+					slog.Error("unable to echo back deletion confirmation")
+				}
 
 			case domain.OnlineMsg:
 				c.setUsrOnlineStatus(msg, true)
@@ -197,23 +185,10 @@ func (c *Client) setMsgAsDelivered(msgID, receiverID string) error {
 		return ErrMsgNotSent
 	}
 	// update in local DB
-	for i := range 5 { // this can yield domain.ErrEditConflict so, retry
-		msgToUpdate, err := c.repo.GetMsgByID(msgID)
-		if err != nil {
-			slog.Error(err.Error())
-			return err
-		}
-		if msgToUpdate.ID == msg.ID {
-			msgToUpdate.DeliveredAt = msg.SentAt
-		}
-		msg.Confirmation = domain.MsgDeliveredConfirmed
-		if err = c.repo.UpdateMsg(msgToUpdate); err != nil {
-			if i == 4 {
-				return err
-			}
-		} else {
-			break
-		}
+	msg.DeliveredAt = msg.SentAt
+	msg.Confirmation = domain.MsgDeliveredConfirmed
+	if err := c.repo.UpdateMsg(msg); err != nil {
+		return err
 	}
 	return nil
 }
@@ -229,40 +204,15 @@ func (c *Client) SetMsgAsRead(msg *domain.Message) error {
 	// this may block, in theory, depends on the connection
 	c.sentMsgs.msgs <- msgToSend
 	if !<-c.sentMsgs.done {
-		// still update in local db with readAt, retry, once again when there is a connection established
-		for i := range 5 {
-			msgToUpdate, err := c.repo.GetMsgByID(msg.ID)
-			if err != nil {
-				slog.Error(err.Error())
-				return err
-			}
-			msgToUpdate.ReadAt = msg.ReadAt
-			if err = c.repo.UpdateMsg(msgToUpdate); err != nil {
-				if i == 4 {
-					return err
-				}
-			} else {
-				break
-			}
+		if err := c.repo.UpdateMsg(msg); err != nil {
+			return err
 		}
 		return ErrMsgNotSent
 	}
-	// once ok update the local msg with MsgReadConfirmed
-	for i := range 5 {
-		msgToUpdate, err := c.repo.GetMsgByID(msg.ID)
-		if err != nil {
-			return err
-		}
-		msgToUpdate.ReadAt = msg.ReadAt
-		msgToUpdate.Confirmation = domain.MsgReadConfirmed
-		if err = c.repo.UpdateMsg(msgToUpdate); err != nil {
-			slog.Error(err.Error())
-			if i == 4 {
-				return err
-			}
-		} else {
-			break
-		}
+	// success, now set as confirmed
+	msg.Confirmation = domain.MsgReadConfirmed
+	if err := c.repo.UpdateMsg(msg); err != nil {
+		return err
 	}
 	return nil
 }
