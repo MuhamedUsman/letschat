@@ -63,17 +63,11 @@ func (f *MessageFacade) WritePagedMessagesToWSConn(
 
 func (f *MessageFacade) processMessage(ctx context.Context, msg *domain.Message) {
 	f.bgTask.Run(func(context.Context) {
-		for i := range 5 { // retries 5 times
-			err := f.txManager.RunInTX(ctx, func(ctx context.Context) error {
-				return f.service.ProcessSentMessages(ctx, msg)
-			})
-			if err == nil {
-				break
-			}
-			// last iteration, log it
-			if err != nil && i == 4 {
-				slog.Error(err.Error(), "msgId", msg.ID)
-			}
+		if err := f.txManager.RunInTX(ctx, func(ctx context.Context) error {
+			return f.service.ProcessSentMessages(ctx, msg)
+		}); err != nil {
+			slog.Error(err.Error())
 		}
+
 	})
 }
