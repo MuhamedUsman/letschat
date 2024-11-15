@@ -72,7 +72,7 @@ func (f *MessageFacade) processMessage(ctx context.Context, msg *domain.Message)
 			}
 			// last iteration, log it
 			if err != nil && i == 4 {
-				slog.Error(err.Error())
+				slog.Error(err.Error(), "msgId", msg.ID)
 			}
 		}
 	})

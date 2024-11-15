@@ -37,41 +37,26 @@ func (*MessageService) PopulateMessage(m domain.MessageSent, sndr *domain.User) 
 }
 
 func (s *MessageService) ProcessSentMessages(ctx context.Context, m *domain.Message) error {
+	// the Primary key constraint ensures, at any instant there only exists 1 msg for a specific msgId, so delete that
+	// msg without specifying the operation
 	switch m.Operation {
 
 	case domain.CreateMsg:
 		return s.messageRepo.InsertMessage(ctx, m)
 
-	case domain.DeliveredMsg:
-		if err := s.messageRepo.DeleteMessageWithOperation(ctx, m.ID, domain.CreateMsg); err != nil {
-			return err
-		}
-		return s.messageRepo.InsertMessage(ctx, m)
-
-	case domain.DeliveredConfirmMsg:
-		return s.messageRepo.DeleteMessageWithOperation(ctx, m.ID, domain.DeliveredMsg)
-
-	case domain.ReadMsg:
-		// if read, delete delivered one if exists
-		if err := s.messageRepo.DeleteMessageWithOperation(ctx, m.ID, domain.DeliveredMsg); err != nil {
-			return err
-		}
-		return s.messageRepo.InsertMessage(ctx, m)
-
-	case domain.ReadConfirmMsg:
-		return s.messageRepo.DeleteMessageWithOperation(ctx, m.ID, domain.ReadMsg)
-
-	case domain.DeleteMsg:
-		// delete all msgs with createMsg, deliveredMsg, readMsg OP's for specific id
+	// these OPs cases will delete msgs with specified Ops, CreateMsg, DeliveredMsg, Any Op
+	case domain.DeliveredMsg, domain.ReadMsg, domain.DeleteMsg:
 		if err := s.messageRepo.DeleteMessage(ctx, m.ID); err != nil {
 			return err
 		}
 		return s.messageRepo.InsertMessage(ctx, m)
 
-	case domain.DeleteConfirmMsg:
-		return s.messageRepo.DeleteMessageWithOperation(ctx, m.ID, domain.DeleteMsg)
+	// these OPs are not for persistence, but merely a confirmation to ensure robustness
+	// these OPs cases will delete msgs with specified Ops, DeliveredMsg, ReadMsg, DeleteMsg
+	case domain.DeliveredConfirmMsg, domain.ReadConfirmMsg, domain.DeleteConfirmMsg:
+		return s.messageRepo.DeleteMessage(ctx, m.ID)
 
-	// these cases will be processed directly if the appropriate party(sender/receiver) is online
+	// these Ops will be processed directly if the appropriate party(sender/receiver) is online
 	case domain.OnlineMsg, domain.OfflineMsg, domain.TypingMsg:
 		return nil
 
