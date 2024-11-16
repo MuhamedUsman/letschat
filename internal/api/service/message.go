@@ -87,15 +87,6 @@ func (s *MessageService) GetUnDeliveredMessages(ctx context.Context, c domain.Ms
 	return nil
 }
 
-func (s *MessageService) GetMessagesAsPage(
-	ctx context.Context,
-	c domain.MsgChan,
-	filter *domain.Filter,
-) (*domain.Metadata, error) {
-	u := utility.ContextGetUser(ctx)
-	return s.messageRepo.GetMessagesAsPage(ctx, u.ID, c, filter)
-}
-
 func (s *MessageService) SaveMessage(ctx context.Context, m *domain.Message) error {
 	return s.messageRepo.InsertMessage(ctx, m)
 }

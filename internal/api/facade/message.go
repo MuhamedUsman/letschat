@@ -51,14 +51,6 @@ func (f *MessageFacade) WriteUnDeliveredMessagesToWSConn(ctx context.Context, c 
 	return f.service.GetUnDeliveredMessages(ctx, c)
 }
 
-func (f *MessageFacade) WritePagedMessagesToWSConn(
-	ctx context.Context,
-	c domain.MsgChan,
-	filter *domain.Filter,
-) (*domain.Metadata, error) {
-	return f.service.GetMessagesAsPage(ctx, c, filter)
-}
-
 // Helpers & Stuff ----------------------------------------------------------------------------------------------------
 
 func (f *MessageFacade) processMessage(ctx context.Context, msg *domain.Message) {

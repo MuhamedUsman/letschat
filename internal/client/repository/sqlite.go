@@ -30,7 +30,6 @@ const ( // Local Database tables for client side application
             sent_at TEXT,
             delivered_at DATETIME,
             read_at DATETIME,
-            confirmation INTEGER DEFAULT 0,
             version INTEGER NOT NULL DEFAULT 1
 		);
 		CREATE INDEX IF NOT EXISTS idx_message_sender_receiver_sent_at ON message(sender_id, receiver_id, sent_at DESC);

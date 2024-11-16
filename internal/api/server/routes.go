@@ -23,8 +23,6 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("POST /v1/tokens/auth", s.GenerateAuthTokenHandler)
 	// Conversation Routes
 	mux.Handle("GET /v1/conversations", protected.ThenFunc(s.GetConversationsHandler))
-	// Messages Routes
-	mux.Handle("GET /v1/messages", protected.ThenFunc(s.GetPagedMessageHandler))
 	// Websocket Routes
 	mux.Handle("/sub", protected.ThenFunc(s.WebsocketSubscribeHandler))
 

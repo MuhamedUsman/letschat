@@ -4,7 +4,6 @@ const (
 	baseUrl               = "http://localhost:8080/v1"
 	usersEndpoint         = "/users"
 	tokensEndpoint        = "/tokens"
-	messagesEndpoint      = "/recvMsgs"
 	conversationsEndpoint = "/conversations"
 	wsBaseUrl             = "ws://localhost:8080"
 	websocketsEndpoint    = "/sub"
@@ -20,8 +19,6 @@ const (
 	authenticate = baseUrl + tokensEndpoint + "/auth" // POST
 
 	getConversations = baseUrl + conversationsEndpoint
-
-	getMessages = baseUrl + messagesEndpoint // GET
 
 	subscribeTo = wsBaseUrl + websocketsEndpoint
 )

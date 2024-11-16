@@ -41,7 +41,7 @@ func (s *Server) WebsocketSubscribeHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// buffered because if there is any error we'll return so we don't want the other writes to block
+	// buffered because if there's any error, just return, don't want the other writes to block
 	errChan := make(chan error, 1) // if there is a single err we log and return
 	reqCtx, cancel := context.WithCancel(r.Context())
 	defer cancel()

@@ -59,43 +59,6 @@ func (r *MessageRepository) GetUnDeliveredMessages(ctx context.Context, rcvrID s
 	return nil
 }
 
-func (r *MessageRepository) GetMessagesAsPage(
-	ctx context.Context,
-	rcvrID string,
-	c domain.MsgChan,
-	filter *domain.Filter,
-) (*domain.Metadata, error) {
-	query := `
-		SELECT COUNT(*) OVER() total_rows, *
-		FROM message
-		WHERE receiver_id = $1
-		ORDER BY sent_at DESC
-		LIMIT $2
-	    OFFSET $3
-		`
-	var rows *sqlx.Rows
-	args := []any{rcvrID, filter.Limit(), filter.Offset()}
-	if tx := contextGetTX(ctx); tx != nil {
-		rows, _ = tx.QueryxContext(ctx, query, args...)
-	} else {
-		rows, _ = r.db.QueryxContext(ctx, query, args...)
-	}
-	var totalRows int
-	for rows.Next() {
-		var row struct {
-			domain.Message
-			TotalRows int `db:"total_rows"`
-		}
-		if err := rows.StructScan(&row); err != nil {
-			return &domain.Metadata{}, err
-		}
-		c <- &row.Message
-		totalRows = row.TotalRows
-	}
-	metadata := domain.CalculateMetadata(totalRows, filter.PageSize, filter.Page)
-	return &metadata, nil
-}
-
 func (r *MessageRepository) InsertMessage(ctx context.Context, m *domain.Message) error {
 	query := `
 		INSERT INTO message (id, sender_id, receiver_id, body, sent_at, delivered_at, read_at, operation) 
@@ -115,19 +78,6 @@ func (r *MessageRepository) InsertMessage(ctx context.Context, m *domain.Message
 		return err
 	}
 	_, err := r.db.NamedExecContext(ctx, query, m)
-	return err
-}
-
-func (r *MessageRepository) DeleteMessageWithOperation(ctx context.Context, mID string, op domain.MsgOperation) error {
-	query := `
-		DELETE FROM message 
-        WHERE id = $1 AND operation = $2
-        `
-	if tx := contextGetTX(ctx); tx != nil {
-		_, err := tx.ExecContext(ctx, query, mID, op)
-		return err
-	}
-	_, err := r.db.ExecContext(ctx, query, mID)
 	return err
 }
 

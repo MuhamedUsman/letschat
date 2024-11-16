@@ -71,17 +71,17 @@ func (c *Client) GetMessagesAsPageAndMarkAsRead(senderID string, page int) ([]*d
 	if err != nil {
 		return nil, nil, err
 	}
+	var msgsToSetAsRead []*domain.Message
 	for _, msg := range msgs {
 		if c.isValidReadUpdate(msg) {
 			msg.ReadAt = ptr(time.Now())
+			msgsToSetAsRead = append(msgsToSetAsRead, msg)
 		}
 	}
-
 	c.BT.Run(func(shtdwnCtx context.Context) {
-		for _, msg := range msgs {
-			if c.isValidReadUpdate(msg) {
-				_ = c.SetMsgAsRead(msg) // Ignore & retry on reconnect
-			}
+		for _, msg := range msgsToSetAsRead {
+			// I/O call
+			_ = c.SetMsgAsRead(msg) // Ignore & retry on reconnect
 		}
 	})
 	return msgs, metadata, nil
@@ -182,8 +182,6 @@ func (c *Client) setMsgAsDelivered(msgID, receiverID string) error {
 	if !<-c.sentMsgs.done {
 		return ErrMsgNotSent
 	}
-	// update in local DB
-	msg.Confirmation = domain.MsgDeliveredConfirmed
 	if err := c.repo.UpdateMsg(msg); err != nil {
 		return err
 	}
@@ -206,8 +204,6 @@ func (c *Client) SetMsgAsRead(msg *domain.Message) error {
 		}
 		return ErrMsgNotSent
 	}
-	// success, now set as confirmed
-	msg.Confirmation = domain.MsgReadConfirmed
 	if err := c.repo.UpdateMsg(msg); err != nil {
 		return err
 	}
@@ -269,7 +265,7 @@ func ptr[T any](v T) *T {
 }
 
 func (c *Client) isValidReadUpdate(msg *domain.Message) bool {
-	return msg.SenderID != c.CurrentUsr.ID && msg.DeliveredAt != nil && msg.Confirmation != domain.MsgReadConfirmed
+	return msg.SenderID != c.CurrentUsr.ID && msg.DeliveredAt != nil && msg.ReadAt == nil
 }
 
 // once there is a message, we also update the conversations as the latest msg will also need update and save to db

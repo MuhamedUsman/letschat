@@ -40,10 +40,10 @@ type ChatViewportModel struct {
 	msgs               []*domain.Message
 	currPage, lastPage int
 	selUsrID           string
-	// currently selected msg (sent one) for info, we'll hide the dialog once the selMsgId is nil
+	// currently selected msg for info, we'll hide the dialog once the selMsgId is nil
 	selMsgId *string
 	// current button selection once the msg info dialog in focus,
-	// 0 -> CopyBtn | 1 -> DeleteBtn
+	// 0 -> CopyBtn | 1 -> DeleteForMeBtn | 2 -> DeleteForEveryoneBtn
 	selMsgDialogBtn int // -1 when the selMsgId is nil
 	// true if gotoFirstMsgMsg is sent, once at first msg, set to false
 	gotoFirstMsg              bool
@@ -254,6 +254,7 @@ func (m ChatViewportModel) Update(msg tea.Msg) (ChatViewportModel, tea.Cmd) {
 			// set it as read also | nil checks, if the terminal focus is not supported, just set the msg as read
 			if msg.SenderID == selUserID && msg.ReadAt == nil && (terminalFocus == nil || *terminalFocus) {
 				t := time.Now()
+				msg.DeliveredAt = &t
 				msg.ReadAt = &t
 				return m, tea.Batch(m.setMsgAsRead(msg), m.listenForMessages())
 			}
@@ -288,17 +289,6 @@ func (m ChatViewportModel) Update(msg tea.Msg) (ChatViewportModel, tea.Cmd) {
 		case domain.TypingMsg:
 			selUserTyping = true
 		default:
-		}
-
-		switch msg.Confirmation {
-		case domain.MsgDeliveredConfirmed, domain.MsgReadConfirmed:
-			for i, ms := range m.msgs {
-				if ms.ID == msg.ID {
-					m.msgs[i] = msg
-					m.chatVp.SetContent(m.renderChatViewport())
-					break
-				}
-			}
 		}
 
 		return m, tea.Batch(m.handleChatViewportUpdate(msg), m.handleMsgDialogViewportUpdate(msg), m.listenForMessages())
