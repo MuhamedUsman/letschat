@@ -44,9 +44,8 @@ type ChatViewportModel struct {
 	selMsgId *string
 	// current button selection once the msg info dialog in focus,
 	// 0 -> CopyBtn | 1 -> DeleteForMeBtn | 2 -> DeleteForEveryoneBtn
-	selMsgDialogBtn int // -1 when the selMsgId is nil
-	// true if gotoFirstMsgMsg is sent, once at first msg, set to false
-	gotoFirstMsg              bool
+	selMsgDialogBtn           int  // -1 when the selMsgId is nil
+	gotoFirstMsg              bool // once at first msg, set to false
 	focus                     bool
 	fetching                  bool
 	recvTypingTimer           timer.Model
@@ -617,12 +616,11 @@ func (m ChatViewportModel) deleteForMe(msgId string) tea.Cmd {
 func (m ChatViewportModel) deleteForEveryone(msgId string) tea.Cmd {
 	t := time.Now()
 	delMsg := &domain.Message{
-		ID:           msgId,
-		SenderID:     m.client.CurrentUsr.ID,
-		ReceiverID:   selUserID,
-		SentAt:       &t,
-		Operation:    domain.DeleteMsg,
-		Confirmation: 0,
+		ID:         msgId,
+		SenderID:   m.client.CurrentUsr.ID,
+		ReceiverID: selUserID,
+		SentAt:     &t,
+		Operation:  domain.DeleteMsg,
 	}
 	return func() tea.Msg {
 		if m.client.WsConnState.Get() != client.Connected {

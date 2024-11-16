@@ -331,12 +331,11 @@ func (m *ChatModel) sendMessage(msg string) tea.Cmd {
 func (m *ChatModel) sendTypingStatus() tea.Cmd {
 	t := time.Now()
 	msgToSnd := domain.Message{
-		ID:           uuid.New().String(),
-		SenderID:     m.client.CurrentUsr.ID,
-		ReceiverID:   selUserID,
-		SentAt:       &t,
-		Operation:    domain.TypingMsg,
-		Confirmation: 0,
+		ID:         uuid.New().String(),
+		SenderID:   m.client.CurrentUsr.ID,
+		ReceiverID: selUserID,
+		SentAt:     &t,
+		Operation:  domain.TypingMsg,
 	}
 	return func() tea.Msg {
 		m.client.SendTypingStatus(msgToSnd)

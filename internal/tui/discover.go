@@ -247,6 +247,10 @@ func (m DiscoverModel) searchUser(query string, page int) tea.Cmd {
 		ids := m.tableUsrIDs
 		l := len(rows)
 		for _, u := range resp.Users {
+			// do not show the current user in the results
+			if u.ID == m.client.CurrentUsr.ID {
+				continue
+			}
 			cell := table.Row{strconv.Itoa(l + 1), u.Name, u.Email, u.CreatedAt.Format("January 2006")}
 			l++
 			rows = append(rows, cell)

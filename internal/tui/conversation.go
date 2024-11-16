@@ -167,6 +167,17 @@ func (m ConversationModel) Update(msg tea.Msg) (ConversationModel, tea.Cmd) {
 		)
 
 	case selDiscUserMsg:
+		items := m.conversationList.Items()
+		// if the selected user is already in the convo list
+		for i, item := range items {
+			usrId := extractUsrId(item.FilterValue())
+			if usrId == msg.id {
+				m.conversationList.Select(i)
+				selUserID = m.getSelConvoUsrID()
+				selUsername = m.getSelConvoUsername()
+				return m, nil
+			}
+		}
 		t := time.Now()
 		convo := &domain.Conversation{
 			UserID:     msg.id,
@@ -348,8 +359,12 @@ func (m ConversationModel) getSelConvoUsrID() string {
 		return ""
 	}
 	fv := m.conversationList.SelectedItem().FilterValue()
-	idWithSomeStylingTxt := strings.Split(fv, "|")[1] // 033d13fa-b6d8-43db-b288-34fe801570e6[1012z
-	return idWithSomeStylingTxt[:36]                  // 033d13fa-b6d8-43db-b288-34fe801570e6
+	return extractUsrId(fv)
+}
+
+func extractUsrId(s string) string {
+	idWithSomeStylingTxt := strings.Split(s, "|")[1] // 033d13fa-b6d8-43db-b288-34fe801570e6[1012z
+	return idWithSomeStylingTxt[:36]                 // 033d13fa-b6d8-43db-b288-34fe801570e6
 }
 
 func (m ConversationModel) getSelConvoUsername() string {

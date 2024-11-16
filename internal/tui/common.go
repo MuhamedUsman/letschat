@@ -59,7 +59,3 @@ type deleteMsgSuccess string // stores id of the deleted msg, remove msg with th
 type clearConvoSuccess struct{}
 
 type createdConvoMsg *domain.Conversation
-
-type gotoFirstMsgMsg struct{}
-
-func gotoFirstMsgCmd() tea.Msg { return gotoFirstMsgMsg{} }

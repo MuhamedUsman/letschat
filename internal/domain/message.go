@@ -58,7 +58,6 @@ type MessageService interface {
 	PopulateMessage(m MessageSent, sndr *User) *Message
 	ProcessSentMessages(ctx context.Context, m *Message) error
 	GetUnDeliveredMessages(ctx context.Context, c MsgChan) error
-	GetMessagesAsPage(ctx context.Context, c MsgChan, filter *Filter) (*Metadata, error)
 	SaveMessage(ctx context.Context, m *Message) error
 }
 
