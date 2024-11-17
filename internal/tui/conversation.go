@@ -303,7 +303,7 @@ func renderStateInfo(convo *domain.Conversation) string {
 	if t == nil {
 		return conversationOnlineIndicator
 	}
-	// TODO: Show last seen instead of ❄️
+	// TODO: Show last seen instead
 	return ""
 }
 

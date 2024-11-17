@@ -176,10 +176,6 @@ var ( // Tab Container Styling
 
 var ( // Discover Styling
 
-	// discoverBar -> SearchBar
-	discoverBar = inputStyle.Width(68).
-			Border(lipgloss.RoundedBorder())
-
 	activeDiscoverBar = activeInputStyle.Width(71).
 				Border(lipgloss.RoundedBorder()).
 				Align(lipgloss.Center)
@@ -191,7 +187,7 @@ var ( // Discover Styling
 
 var ( // Conversation Styling
 
-	// updated by TabContainerModel so we can keep the divider proportional to the gap
+	// updated by TabContainerModel so we can keep the verticalDivider proportional to the gap
 	tabGapLeftWidth int
 
 	conversationWidth  = func() int { return tabGapLeftWidth - 1 }
@@ -284,7 +280,8 @@ var (
 				Padding(0, 2)
 )
 
-var (
+var ( // Message Info Styling
+
 	msgInfoHeaderStyle = lipgloss.NewStyle().
 				Background(primaryContrastColor).
 				Foreground(primaryColor).
@@ -311,6 +308,55 @@ var (
 	msgInfoBtnStyle = lipgloss.NewStyle().
 			MarginRight(1).
 			Padding(0, 2)
+)
+
+var ( // Preferences Styles
+
+	updateProfileWidth = func() int { return tabGapLeftWidth + 14 }
+	usageWidth         = func() int { return tabGapRightWithTabsWidth - 10 }
+
+	verticalDivider = lipgloss.NewStyle().
+			BorderStyle(lipgloss.NormalBorder()).
+			BorderRight(true).
+			BorderForeground(darkGreyColor)
+
+	sectionTitleStyle = lipgloss.NewStyle().
+				Border(lipgloss.InnerHalfBlockBorder(), true).
+				BorderForeground(primaryContrastColor).
+				Background(primaryContrastColor).
+				Foreground(primaryColor).
+				Margin(2, 0, 1, 0).
+				Padding(0, 2).
+				Italic(true)
+)
+
+var ( // Update Profile Form Styles
+
+	updateProfileInputHeaderStyle = lipgloss.NewStyle().
+					Foreground(primarySubtleDarkColor).
+					MarginLeft(1)
+
+	updateProfileInputFieldStyle = lipgloss.NewStyle().
+					Border(lipgloss.RoundedBorder(), true).
+					BorderForeground(primaryContrastColor).
+					Padding(0, 1)
+
+	updateProfileFormStyle = lipgloss.NewStyle().
+				Margin(1, 0, 0, 3)
+
+	updateProfileFromBlurBtnStyle = lipgloss.NewStyle().
+					Background(darkGreyColor).
+					Foreground(lightGreyColor).
+					MarginTop(1).
+					Padding(0, 2)
+
+	updateProfileFormActiveBtnStyle = updateProfileFromBlurBtnStyle.
+					Background(primaryColor).
+					Foreground(primaryContrastColor)
+
+	updateProfileFormDangerBtnStyle = updateProfileFromBlurBtnStyle.
+					Background(dangerColor).
+					Foreground(whiteColor)
 )
 
 var ( // Bunny Stying

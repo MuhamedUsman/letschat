@@ -6,7 +6,7 @@ require (
 	github.com/99designs/keyring v1.2.2
 	github.com/atotto/clipboard v0.1.4
 	github.com/charmbracelet/bubbles v0.20.0
-	github.com/charmbracelet/bubbletea v1.2.1
+	github.com/charmbracelet/bubbletea v1.2.2
 	github.com/charmbracelet/lipgloss v1.0.0
 	github.com/charmbracelet/x/ansi v0.4.5
 	github.com/coder/websocket v1.8.12
@@ -18,7 +18,7 @@ require (
 	github.com/lrstanley/bubblezone v0.0.0-20240914071701-b48c55a5e78e
 	github.com/mattn/go-sqlite3 v1.14.24
 	golang.org/x/crypto v0.29.0
-	golang.org/x/exp v0.0.0-20241009180824-f66d83c29e7c
+	golang.org/x/exp v0.0.0-20241108190413-2d47ceb2692f
 	golang.org/x/time v0.8.0
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
 )

@@ -27,16 +27,17 @@ type LoginStateBroadcast struct {
 
 // TabContainerModel -> main TUI model for this application
 type TabContainerModel struct {
-	discover  DiscoverModel
-	letschat  LetschatModel
-	tabs      []string
-	activeTab int
-	errMsg    *errMsg
-	timer     timer.Model
-	stopwatch stopwatch.Model
-	spinner   *spinner.Model
-	client    *client.Client
-	lsb       LoginStateBroadcast
+	discover    DiscoverModel
+	letschat    LetschatModel
+	preferences PreferencesModel
+	tabs        []string
+	activeTab   int
+	errMsg      *errMsg
+	timer       timer.Model
+	stopwatch   stopwatch.Model
+	spinner     *spinner.Model
+	client      *client.Client
+	lsb         LoginStateBroadcast
 }
 
 func InitialTabContainerModel() TabContainerModel {
@@ -48,14 +49,15 @@ func InitialTabContainerModel() TabContainerModel {
 	c := client.Get()
 	s := spinner.New(spinner.WithStyle(spinnerStyle), spinner.WithSpinner(spinner.Points))
 	return TabContainerModel{
-		discover:  InitialDiscoverModel(c),
-		letschat:  InitialLetschatModel(c),
-		tabs:      t,
-		activeTab: 1,
-		timer:     timer.New(0),
-		stopwatch: stopwatch.New(),
-		spinner:   &s,
-		client:    c,
+		discover:    InitialDiscoverModel(c),
+		letschat:    InitialLetschatModel(c),
+		preferences: NewPreferencesModel(c),
+		tabs:        t,
+		activeTab:   1,
+		timer:       timer.New(0),
+		stopwatch:   stopwatch.New(),
+		spinner:     &s,
+		client:      c,
 	}
 }
 
@@ -68,6 +70,7 @@ func (m TabContainerModel) Init() tea.Cmd {
 	return tea.Batch(
 		m.discover.Init(),
 		m.letschat.Init(),
+		m.preferences.Init(),
 		m.stopwatch.Init(),
 		m.readOnUsrLoggedInChan(),
 		m.runStartUpProcesses(),
@@ -170,9 +173,7 @@ func (m TabContainerModel) View() string {
 	if m.errMsg != nil {
 		return renderErrContainer(m.errMsg.err, m.errMsg.code, m.timer.View())
 	}
-
 	tabs := make([]string, len(m.tabs))
-
 	for i, t := range m.tabs {
 		if i == m.activeTab {
 			t = zone.Mark(t, activeTab.Render(t))
@@ -182,7 +183,6 @@ func (m TabContainerModel) View() string {
 			tabs = append(tabs, t)
 		}
 	}
-
 	t := lipgloss.JoinHorizontal(
 		lipgloss.Center,
 		tabs...,
@@ -194,7 +194,7 @@ func (m TabContainerModel) View() string {
 	if m.client.CurrentUsr != nil {
 		t = renderTabsWithGapsAndText(t, m.client.CurrentUsr.Name, s, m.client.WsConnState.Get())
 	} else {
-		// conn Confirmation will be ignored in this case
+		// conn Confirmation will be ignored of currentUsr is nil
 		t = renderTabsWithGapsAndText(t, "", s, m.client.WsConnState.Get())
 	}
 	content := m.populateActiveTabContent()
@@ -222,7 +222,7 @@ func renderLeftText(txt string, s client.WsConnState) string {
 func renderTabsWithGapsAndText(tabs, textL, textR string, state client.WsConnState) string {
 	w := (terminalWidth - lipgloss.Width(tabs) - 4) / 2
 	gapL := tabGapLeft.Width(w).Render(statusTextStyle.Render("Letschat"))
-	// used for divider in conversations tab
+	// used for verticalDivider in conversations tab
 	tabGapLeftWidth = lipgloss.Width(gapL)
 	gapR := tabGapRight.Width(w).Render(statusTextStyle.Render(textR))
 	// used for chat container in conversations tab
@@ -271,9 +271,10 @@ func (m *TabContainerModel) setChildModelFocus() {
 }
 
 func (m *TabContainerModel) handleChildModelUpdates(msg tea.Msg) tea.Cmd {
-	cmds := make([]tea.Cmd, 2)
+	cmds := make([]tea.Cmd, 3)
 	m.discover, cmds[0] = m.discover.Update(msg)
 	m.letschat, cmds[1] = m.letschat.Update(msg)
+	m.preferences, cmds[2] = m.preferences.Update(msg)
 	return tea.Batch(cmds...)
 }
 
@@ -310,6 +311,9 @@ func (m *TabContainerModel) populateActiveTabContent() string {
 		return m.discover.View()
 	case 1:
 		return m.letschat.View()
+	case 2:
+		return m.preferences.View()
+
 	default:
 		return ""
 	}
