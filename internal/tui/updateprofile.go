@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"github.com/M0hammadUsman/letschat/internal/client"
 	"github.com/M0hammadUsman/letschat/internal/domain"
 	"github.com/charmbracelet/bubbles/cursor"
 	"github.com/charmbracelet/bubbles/spinner"
@@ -9,32 +10,46 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	zone "github.com/lrstanley/bubblezone"
+	"golang.org/x/exp/maps"
 	"strings"
 )
 
-type UpdateProfileModel struct {
-	inputTitles  []string
-	txtInputs    []textinput.Model
-	placeholders []string
-	tabIdx       int
-	spinner      spinner.Model
-	spin         bool
-	dangerState  bool
-	includePass  bool
-	ev           *domain.ErrValidation
+type inputStyles struct {
+	header lipgloss.Style
+	field  lipgloss.Style
 }
 
-func NewUpdateProfileModel() UpdateProfileModel {
+type UpdateProfileModel struct {
+	inputTitles      []string
+	errFieldTitles   []string
+	inputFieldStyles []inputStyles
+	txtInputs        []textinput.Model
+	placeholders     []string
+	tabIdx           int
+	spinner          spinner.Model
+	spin             bool
+	dangerState      bool
+	includePass      bool
+	ev               *domain.ErrValidation
+	client           *client.Client
+}
+
+func NewUpdateProfileModel(c *client.Client) UpdateProfileModel {
 	up := UpdateProfileModel{
-		inputTitles: []string{"Name", "Email", "Previous Password", "New Password", "Confirm Password"},
-		txtInputs:   make([]textinput.Model, 5),
-		tabIdx:      -1,
-		includePass: true,
-		spinner:     spinner.New(),
+		inputTitles:      []string{"Name", "Email", "Previous Password", "New Password", "Confirm Password"},
+		errFieldTitles:   []string{"name", "email", "prevPass", "newPass", "confirmPass"},
+		inputFieldStyles: make([]inputStyles, 5),
+		txtInputs:        make([]textinput.Model, 5),
+		tabIdx:           -1,
+		includePass:      true,
+		spinner:          spinner.New(),
+		ev:               domain.NewErrValidation(),
+		client:           c,
 	}
 	for i := range up.txtInputs {
 		crsr := cursor.New()
 		crsr.Style = lipgloss.NewStyle().Foreground(primaryColor)
+		crsr.TextStyle = crsr.Style
 
 		t := textinput.New()
 		t.Prompt = ""
@@ -44,10 +59,6 @@ func NewUpdateProfileModel() UpdateProfileModel {
 		t.CharLimit = 64
 
 		switch i {
-		case 0:
-			t.Placeholder = "Muhammad Usman"
-		case 1:
-			t.Placeholder = "usmannadeem3344@gmail.com"
 		case 2, 3, 4:
 			t.EchoCharacter = '*'
 			t.EchoMode = textinput.EchoPassword
@@ -59,10 +70,11 @@ func NewUpdateProfileModel() UpdateProfileModel {
 }
 
 func (m UpdateProfileModel) Init() tea.Cmd {
-	return textinput.Blink
+	return nil
 }
 
 func (m UpdateProfileModel) Update(msg tea.Msg) (UpdateProfileModel, tea.Cmd) {
+
 	switch msg := msg.(type) {
 
 	case tea.WindowSizeMsg:
@@ -76,13 +88,15 @@ func (m UpdateProfileModel) Update(msg tea.Msg) (UpdateProfileModel, tea.Cmd) {
 				m.tabIdx = 4
 			}
 			m.tabIdx = (m.tabIdx + 1) % (len(m.inputTitles) + 2)
-			return m, m.focusTxtInputsAccordingly()
+			m.focusTxtInputsAccordingly()
 
 		case "esc":
 			m.tabIdx = -1
+			m.removeAllErrors()
 			return m, m.focusTxtInputsAccordingly()
 
 		case "enter":
+
 			switch m.tabIdx {
 			case 0, 1, 2, 3, 4:
 				if !m.includePass && m.tabIdx == 1 {
@@ -102,7 +116,9 @@ func (m UpdateProfileModel) Update(msg tea.Msg) (UpdateProfileModel, tea.Cmd) {
 					m.focusTxtInputsAccordingly()
 				}
 			case 6:
-
+				if err := m.validateTxtInputs(); err == nil {
+					return m, nil
+				}
 			}
 
 		case "up", "left":
@@ -117,17 +133,17 @@ func (m UpdateProfileModel) Update(msg tea.Msg) (UpdateProfileModel, tea.Cmd) {
 		}
 
 	case tea.MouseMsg:
-		if msg.Button == tea.MouseButtonLeft && msg.Action == tea.MouseActionRelease {
+		if msg.Button == tea.MouseButtonLeft {
 			for i := range 7 {
 				if zone.Get(fmt.Sprint("formItem", i)).InBounds(msg) {
 					m.tabIdx = i
 					m.focusTxtInputsAccordingly()
 				}
 			}
-
 		}
 	}
 
+	m.removeErrAccordingToTabIdx()
 	return m, tea.Batch(m.handleTxtInputUpdate(msg))
 }
 
@@ -141,21 +157,23 @@ func (m UpdateProfileModel) View() string {
 
 // Helpers & Stuff -----------------------------------------------------------------------------------------------------
 
+func (m *UpdateProfileModel) populatePlaceholders() {
+	if m.client.CurrentUsr != nil {
+		m.txtInputs[0].Placeholder = m.client.CurrentUsr.Name
+		m.txtInputs[1].Placeholder = m.client.CurrentUsr.Email
+	}
+}
+
 func (m UpdateProfileModel) renderForm() string {
+	m.manageInputStylesAccordingly()
 	var sb strings.Builder
 	for i, t := range m.inputTitles {
-		// do not include password fields
 		if i == 2 && !m.includePass {
+			// do not include password fields
 			break
 		}
-		title := updateProfileInputHeaderStyle.Render(t)
-		field := updateProfileInputFieldStyle.Width(updateProfileWidth() - 8).Render(m.txtInputs[i].View())
-		if i == m.tabIdx {
-			title = updateProfileInputHeaderStyle.Italic(true).Foreground(primaryColor).Render(t)
-			field = updateProfileInputFieldStyle.Width(updateProfileWidth() - 8).
-				BorderForeground(primaryColor).
-				Render(m.txtInputs[i].View())
-		}
+		title := m.inputFieldStyles[i].header.Render(t)
+		field := m.inputFieldStyles[i].field.Render(m.txtInputs[i].View())
 		sb.WriteString(title)
 		sb.WriteString("\n")
 		field = zone.Mark(fmt.Sprint("formItem", i), field)
@@ -193,6 +211,29 @@ func (m UpdateProfileModel) renderFormBtns() string {
 	return lipgloss.PlaceHorizontal(updateProfileWidth()-6, lipgloss.Center, btns)
 }
 
+func (m *UpdateProfileModel) manageInputStylesAccordingly() {
+	for i := range m.inputTitles {
+		if i == 2 && !m.includePass {
+			// do not include password fields
+			break
+		}
+		m.inputFieldStyles[i].header = updateProfileInputHeaderStyle
+		m.inputFieldStyles[i].field = updateProfileInputFieldStyle.Width(updateProfileWidth() - 8)
+		if i == m.tabIdx {
+			m.inputFieldStyles[i].header = updateProfileInputHeaderStyle.Italic(true).Foreground(primaryColor)
+			m.inputFieldStyles[i].field = updateProfileInputFieldStyle.Width(updateProfileWidth() - 8).BorderForeground(primaryColor)
+		}
+	}
+	if m.ev.HasErrors() {
+		for j, et := range m.errFieldTitles { // et -> errorTitle
+			if _, ok := m.ev.Errors[et]; ok {
+				m.inputFieldStyles[j].header = updateProfileInputHeaderDangerStyle
+				m.inputFieldStyles[j].field = updateProfileInputFieldDangerStyle
+			}
+		}
+	}
+}
+
 func (m *UpdateProfileModel) handleTxtInputUpdate(msg tea.Msg) tea.Cmd {
 	cmds := make([]tea.Cmd, len(m.txtInputs))
 	for i := range m.txtInputs {
@@ -215,5 +256,65 @@ func (m *UpdateProfileModel) focusTxtInputsAccordingly() tea.Cmd {
 func (m *UpdateProfileModel) setTxtInputWidthAccordingly() {
 	for i := range m.txtInputs {
 		m.txtInputs[i].Width = updateProfileWidth() - 11
+	}
+}
+
+// validateUserRegisterModel validates the input form then adds the errors to ev
+func (m *UpdateProfileModel) validateTxtInputs() error {
+	// clear the previous errors
+	maps.Clear(m.ev.Errors)
+	for i := range m.txtInputs {
+		if !m.includePass && i == 2 {
+			break
+		}
+		switch i {
+		case 0:
+			domain.ValidateName(m.txtInputs[i].Value(), m.ev)
+		case 1:
+			domain.ValidateEmail(m.txtInputs[i].Value(), m.ev)
+		case 2, 3, 4:
+			domain.ValidPlainPasswordWithKey(m.txtInputs[i].Value(), m.ev, m.errFieldTitles[i])
+		}
+	}
+	// if passwords do not match
+	if m.txtInputs[4].Value() != m.txtInputs[3].Value() {
+		m.txtInputs[4].Reset()
+		m.ev.AddError(m.errFieldTitles[4], "must match the new password")
+	}
+	if m.ev.HasErrors() {
+		for i, et := range m.errFieldTitles { // et -> errorTitle
+			if err, ok := m.ev.Errors[et]; ok {
+				m.populateErr(i, err)
+			}
+		}
+		return ErrValidation
+	}
+	return nil
+}
+
+func (m *UpdateProfileModel) populateErr(idx int, err string) {
+	m.txtInputs[idx].Reset()
+	m.txtInputs[idx].Placeholder = err
+	m.txtInputs[idx].PlaceholderStyle = lipgloss.NewStyle().Foreground(dangerColor)
+	m.spin = false
+}
+
+func (m *UpdateProfileModel) removeErrAccordingToTabIdx() {
+	// Remove errors as field gets into focus
+	if m.ev.HasErrors() {
+		for i, et := range m.errFieldTitles {
+			if m.txtInputs[i].Focused() {
+				m.txtInputs[i].Placeholder = ""
+				delete(m.ev.Errors, et)
+				break
+			}
+		}
+	}
+}
+
+func (m *UpdateProfileModel) removeAllErrors() {
+	maps.Clear(m.ev.Errors)
+	for i := range m.txtInputs {
+		m.txtInputs[i].Placeholder = ""
 	}
 }

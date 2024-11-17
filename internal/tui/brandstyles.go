@@ -17,6 +17,7 @@ var ( // Global Styling
 	primarySubtleDarkColor = lipgloss.AdaptiveColor{Light: "#6c5300", Dark: "#8b7000"}
 	primaryContrastColor   = lipgloss.AdaptiveColor{Light: "#FFC700", Dark: "#4b3b00"}
 	dangerColor            = lipgloss.AdaptiveColor{Light: "#ff7b4e", Dark: "#FF5C00"}
+	dangerDarkColor        = lipgloss.AdaptiveColor{Light: "#b65d3e", Dark: "#a34a00"}
 	whiteColor             = lipgloss.AdaptiveColor{Light: "#202020", Dark: "#FFFCE4"}
 	blackColor             = lipgloss.AdaptiveColor{Light: "#FFFCE4", Dark: "#202020"}
 	darkGreyColor          = lipgloss.AdaptiveColor{Light: "#808080", Dark: "#404040"}
@@ -336,10 +337,14 @@ var ( // Update Profile Form Styles
 					Foreground(primarySubtleDarkColor).
 					MarginLeft(1)
 
+	updateProfileInputHeaderDangerStyle = updateProfileInputHeaderStyle.Foreground(dangerDarkColor)
+
 	updateProfileInputFieldStyle = lipgloss.NewStyle().
 					Border(lipgloss.RoundedBorder(), true).
 					BorderForeground(primaryContrastColor).
 					Padding(0, 1)
+
+	updateProfileInputFieldDangerStyle = updateProfileInputFieldStyle.BorderForeground(dangerDarkColor)
 
 	updateProfileFormStyle = lipgloss.NewStyle().
 				Margin(1, 0, 0, 3)

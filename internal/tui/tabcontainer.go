@@ -225,7 +225,7 @@ func renderTabsWithGapsAndText(tabs, textL, textR string, state client.WsConnSta
 	// used for verticalDivider in conversations tab
 	tabGapLeftWidth = lipgloss.Width(gapL)
 	gapR := tabGapRight.Width(w).Render(statusTextStyle.Render(textR))
-	// used for chat container in conversations tab
+	// used for chat field in conversations tab
 	tabGapRightWithTabsWidth = lipgloss.Width(gapR) + lipgloss.Width(tabs)
 	if textL != "" {
 		gapL = tabGapLeft.Width(w).Render(renderLeftText(textL, state))

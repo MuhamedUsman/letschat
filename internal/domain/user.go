@@ -91,3 +91,9 @@ func ValidPlainPassword(pass string, ev *ErrValidation) {
 	ev.Evaluate(pass == "" || len(pass) >= 8, "password", "must be at least 8 bytes long")
 	ev.Evaluate(len(pass) <= 72, "password", "must no be more than 72 bytes long")
 }
+
+func ValidPlainPasswordWithKey(pass string, ev *ErrValidation, errKey string) {
+	ev.Evaluate(pass != "", errKey, "must be provided")
+	ev.Evaluate(pass == "" || len(pass) >= 8, errKey, "must be at least 8 bytes long")
+	ev.Evaluate(len(pass) <= 72, errKey, "must no be more than 72 bytes long")
+}

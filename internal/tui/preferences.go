@@ -15,7 +15,7 @@ type PreferencesModel struct {
 
 func NewPreferencesModel(c *client.Client) PreferencesModel {
 	return PreferencesModel{
-		up:      NewUpdateProfileModel(),
+		up:      NewUpdateProfileModel(c),
 		usageVp: viewport.New(0, 0),
 		client:  c,
 	}
