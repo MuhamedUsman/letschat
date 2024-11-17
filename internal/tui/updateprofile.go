@@ -83,12 +83,13 @@ func (m UpdateProfileModel) Update(msg tea.Msg) (UpdateProfileModel, tea.Cmd) {
 			return m, m.focusTxtInputsAccordingly()
 
 		case "enter":
-			if !m.includePass && m.tabIdx == 1 {
-				m.tabIdx = 5
-			}
 			switch m.tabIdx {
 			case 0, 1, 2, 3, 4:
-				m.tabIdx++
+				if !m.includePass && m.tabIdx == 1 {
+					m.tabIdx = 5
+				} else {
+					m.tabIdx++
+				}
 				m.focusTxtInputsAccordingly()
 			case 5:
 				m.includePass = !m.includePass
@@ -119,7 +120,7 @@ func (m UpdateProfileModel) Update(msg tea.Msg) (UpdateProfileModel, tea.Cmd) {
 		if msg.Button == tea.MouseButtonLeft && msg.Action == tea.MouseActionRelease {
 			for i := range 7 {
 				if zone.Get(fmt.Sprint("formItem", i)).InBounds(msg) {
-					m.tabIdx = 1
+					m.tabIdx = i
 					m.focusTxtInputsAccordingly()
 				}
 			}
