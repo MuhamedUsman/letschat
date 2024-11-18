@@ -63,10 +63,11 @@ type UserAuth struct {
 }
 
 type UserUpdate struct {
-	Name            string `json:"name"`
-	Email           string `json:"email"`
-	NewPassword     string `json:"newPassword"`
-	CurrentPassword string `json:"currentPassword"`
+	ID              string  `json:"id"`
+	Name            string  `json:"name"`
+	Email           string  `json:"email"`
+	NewPassword     *string `json:"newPassword"`
+	CurrentPassword *string `json:"currentPassword"`
 }
 
 func (u *User) IsAnonymousUser() bool {

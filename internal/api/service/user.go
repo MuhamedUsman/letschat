@@ -83,29 +83,34 @@ func (s *UserService) UpdateUser(ctx context.Context, u *domain.UserUpdate) erro
 	ev := domain.NewErrValidation()
 	domain.ValidateName(u.Name, ev)
 	domain.ValidateEmail(u.Email, ev)
-	domain.ValidPlainPassword(u.NewPassword, ev)
+	if u.NewPassword != nil {
+		domain.ValidPlainPassword(*u.NewPassword, ev)
+	}
 	if ev.HasErrors() {
 		return ev
 	}
-	usr, err := s.userRepository.GetByUniqueField(ctx, "email", u.Email)
+	usr, err := s.userRepository.GetByUniqueField(ctx, "id", u.ID)
 	if err != nil {
 		if errors.Is(err, domain.ErrRecordNotFound) {
-			ev.AddError("email", "not exists")
+			ev.AddError("id", "not exists")
 			return ev
 		}
 		return err
 	}
-	if !comparePasswordHash(usr.Password, u.CurrentPassword) {
-		ev.AddError("currentPassword", "does not match")
-		return ev
-	}
-	newPassHash, err := generatePasswordHash(u.NewPassword)
-	if err != nil {
-		return err
-	}
 	usr.Name = u.Name
 	usr.Email = u.Email
-	usr.Password = newPassHash
+	if u.CurrentPassword != nil {
+		if !comparePasswordHash(usr.Password, *u.CurrentPassword) {
+			ev.AddError("currentPassword", "does not match")
+			return ev
+		}
+		var newPassHash []byte
+		newPassHash, err = generatePasswordHash(*u.NewPassword)
+		if err != nil {
+			return err
+		}
+		usr.Password = newPassHash
+	}
 	if err = s.userRepository.UpdateUser(ctx, usr); err != nil {
 		return err
 	}
