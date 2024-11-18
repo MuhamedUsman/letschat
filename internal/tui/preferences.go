@@ -29,8 +29,6 @@ func (m PreferencesModel) Update(msg tea.Msg) (PreferencesModel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "ctrl+c", "q":
-			return m, tea.Quit
 		}
 	}
 	return m, tea.Batch(m.handleUsageViewportUpdate(msg), m.handleUpdateProfileModelUpdate(msg))

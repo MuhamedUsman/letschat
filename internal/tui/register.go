@@ -100,17 +100,16 @@ func (m UserRegisterModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if err := m.validateUserRegisterModel(); err == nil {
 						return m, tea.Batch(m.spinner.Tick, m.registerUser())
 					}
-				} else {
-					return m, nil
 				}
-			} else if m.tabIdx == 4 {
+				return m, nil
+			}
+			if m.tabIdx == 4 {
 				loginModel := InitialLoginModel()
 				return loginModel, loginModel.Init()
-			} else {
-				m.tabIdx++
-				if m.tabIdx == 3 {
-					m.activeBtn = 0
-				}
+			}
+			m.tabIdx++
+			if m.tabIdx == 3 {
+				m.activeBtn = 0
 			}
 
 		case "tab":

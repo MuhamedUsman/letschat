@@ -110,6 +110,9 @@ func (m TabContainerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if !m.timer.Timedout() {
 				return m, nil
 			}
+		case "esc":
+			m.errMsg = nil
+			m.timer.Timeout = 0 * time.Second
 		}
 
 	case tea.MouseMsg:
@@ -157,7 +160,9 @@ func (m TabContainerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.spinner.Tick
 
 	case spinner.TickMsg:
-		return m, m.handleSpinnerUpdate(msg)
+		if msg.ID == m.spinner.ID() {
+			return m, m.handleSpinnerUpdate(msg)
+		}
 
 	case resetSpinnerMsg:
 		m.resetSpinner()

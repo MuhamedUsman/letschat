@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	zone "github.com/lrstanley/bubblezone"
 	"log/slog"
+	"net/http"
 	"strconv"
 	"unicode/utf8"
 )
@@ -237,7 +238,7 @@ type tableResp struct {
 func (m DiscoverModel) searchUser(query string, page int) tea.Cmd {
 	return func() tea.Msg {
 		resp, code, err := m.client.SearchUser(query, page)
-		if code == 401 {
+		if code == http.StatusUnauthorized {
 			return requireAuthMsg{}
 		}
 		if err != nil {

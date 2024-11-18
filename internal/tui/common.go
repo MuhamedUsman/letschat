@@ -59,3 +59,13 @@ type deleteMsgSuccess string // stores id of the deleted msg, remove msg with th
 type clearConvoSuccess struct{}
 
 type createdConvoMsg *domain.Conversation
+
+type hideSuccessMsg struct{}
+
+func countdownShowSuccessCmd() tea.Cmd {
+	return func() tea.Msg {
+		t := time.NewTimer(2 * time.Second)
+		<-t.C
+		return hideSuccessMsg{}
+	}
+}

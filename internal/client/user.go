@@ -134,6 +134,52 @@ func (c *Client) ActivateUser(otp string) error {
 	return nil
 }
 
+func (c *Client) UpdateUser(u domain.UserUpdate) (*domain.ErrValidation, int, error) {
+	jsonBytes, err := json.Marshal(u)
+	if err != nil {
+		slog.Error(err.Error())
+		return nil, 0, ErrApplication
+	}
+	req, err := http.NewRequest(http.MethodPut, updateUser, bytes.NewBuffer(jsonBytes))
+	if err != nil {
+		slog.Error(err.Error())
+		return nil, 0, ErrApplication
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+c.AuthToken)
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		slog.Error(err.Error())
+		return nil, http.StatusServiceUnavailable, getMostNestedError(err)
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode == http.StatusUnprocessableEntity {
+		var ev struct {
+			Errors map[string]string `json:"errors"`
+		}
+		ev.Errors = make(map[string]string)
+
+		var respBody []byte
+		respBody, err = io.ReadAll(res.Body)
+		if err != nil {
+			slog.Error(err.Error())
+			return nil, res.StatusCode, ErrServerValidation
+		}
+
+		if err = json.Unmarshal(respBody, &ev); err != nil {
+			slog.Error(err.Error())
+			return nil, 0, ErrApplication
+		}
+
+		dev := domain.NewErrValidation()
+		dev.Errors = ev.Errors
+		return dev, res.StatusCode, ErrServerValidation
+
+	}
+	return nil, res.StatusCode, nil
+}
+
 type PagedUserResponse struct {
 	Metadata domain.Metadata `json:"metadata"`
 	Users    []domain.User   `json:"users"`

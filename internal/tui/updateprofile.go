@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"errors"
 	"fmt"
 	"github.com/M0hammadUsman/letschat/internal/client"
 	"github.com/M0hammadUsman/letschat/internal/domain"
@@ -11,6 +12,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	zone "github.com/lrstanley/bubblezone"
 	"golang.org/x/exp/maps"
+	"net/http"
 	"strings"
 )
 
@@ -20,18 +22,16 @@ type inputStyles struct {
 }
 
 type UpdateProfileModel struct {
-	inputTitles      []string
-	errFieldTitles   []string
-	inputFieldStyles []inputStyles
-	txtInputs        []textinput.Model
-	placeholders     []string
-	tabIdx           int
-	spinner          spinner.Model
-	spin             bool
-	dangerState      bool
-	includePass      bool
-	ev               *domain.ErrValidation
-	client           *client.Client
+	inputTitles                                 []string
+	errFieldTitles                              []string
+	inputFieldStyles                            []inputStyles
+	txtInputs                                   []textinput.Model
+	placeholders                                []string
+	tabIdx                                      int
+	spinner                                     spinner.Model
+	spin, dangerState, includePass, showSuccess bool
+	ev                                          *domain.ErrValidation
+	client                                      *client.Client
 }
 
 func NewUpdateProfileModel(c *client.Client) UpdateProfileModel {
@@ -41,11 +41,11 @@ func NewUpdateProfileModel(c *client.Client) UpdateProfileModel {
 		inputFieldStyles: make([]inputStyles, 5),
 		txtInputs:        make([]textinput.Model, 5),
 		tabIdx:           -1,
-		includePass:      true,
-		spinner:          spinner.New(),
+		spinner:          newSpinner(),
 		ev:               domain.NewErrValidation(),
 		client:           c,
 	}
+
 	for i := range up.txtInputs {
 		crsr := cursor.New()
 		crsr.Style = lipgloss.NewStyle().Foreground(primaryColor)
@@ -96,7 +96,6 @@ func (m UpdateProfileModel) Update(msg tea.Msg) (UpdateProfileModel, tea.Cmd) {
 			return m, m.focusTxtInputsAccordingly()
 
 		case "enter":
-
 			switch m.tabIdx {
 			case 0, 1, 2, 3, 4:
 				if !m.includePass && m.tabIdx == 1 {
@@ -116,8 +115,11 @@ func (m UpdateProfileModel) Update(msg tea.Msg) (UpdateProfileModel, tea.Cmd) {
 					m.focusTxtInputsAccordingly()
 				}
 			case 6:
-				if err := m.validateTxtInputs(); err == nil {
-					return m, nil
+				if !m.spin {
+					m.spin = true
+					if err := m.validateTxtInputs(); err == nil {
+						return m, tea.Batch(m.spinner.Tick, m.updateUser())
+					}
 				}
 			}
 
@@ -141,6 +143,38 @@ func (m UpdateProfileModel) Update(msg tea.Msg) (UpdateProfileModel, tea.Cmd) {
 				}
 			}
 		}
+
+	case spinner.TickMsg:
+		if msg.ID == m.spinner.ID() {
+			var cmd tea.Cmd
+			m.spinner, cmd = m.spinner.Update(msg)
+			return m, cmd
+		}
+
+	case doneMsg:
+		m.spin = false
+		m.spinner = newSpinner()
+		m.resetAllfields()
+		m.includePass = false
+		m.showSuccess = true
+		m.tabIdx = -1
+		return m, countdownShowSuccessCmd()
+
+	case hideSuccessMsg:
+		m.showSuccess = false
+
+	case *domain.ErrValidation:
+		m.spin = false
+		m.spinner = newSpinner()
+		if msg.HasErrors() {
+			m.populateServerErr(msg)
+		}
+
+	case errMsg:
+		m.spin = false
+		m.spinner = newSpinner()
+		return m, func() tea.Msg { return &msg } // TabContainerModel will show this
+
 	}
 
 	m.removeErrAccordingToTabIdx()
@@ -157,10 +191,17 @@ func (m UpdateProfileModel) View() string {
 
 // Helpers & Stuff -----------------------------------------------------------------------------------------------------
 
-func (m *UpdateProfileModel) populatePlaceholders() {
+func newSpinner() spinner.Model {
+	s := spinner.New()
+	s.Style = lipgloss.NewStyle().Foreground(primaryColor)
+	s.Spinner = spinner.Points
+	return s
+}
+
+func (m *UpdateProfileModel) populateDefaultFields() {
 	if m.client.CurrentUsr != nil {
-		m.txtInputs[0].Placeholder = m.client.CurrentUsr.Name
-		m.txtInputs[1].Placeholder = m.client.CurrentUsr.Email
+		m.txtInputs[0].SetValue(m.client.CurrentUsr.Name)
+		m.txtInputs[1].SetValue(m.client.CurrentUsr.Email)
 	}
 }
 
@@ -181,6 +222,10 @@ func (m UpdateProfileModel) renderForm() string {
 		sb.WriteString("\n")
 	}
 	sb.WriteString(m.renderFormBtns())
+	if m.showSuccess {
+		successMsg := updateProfileFormSuccessStyle.Width(updateProfileWidth() - 10).Render()
+		sb.WriteString(lipgloss.PlaceHorizontal(updateProfileWidth()-6, lipgloss.Center, successMsg))
+	}
 	return sb.String()
 }
 
@@ -188,8 +233,8 @@ func (m UpdateProfileModel) renderFormBtns() string {
 	s1 := "INCLUDE PASSWORD"
 	s2 := "EXCLUDE PASSWORD"
 	s3 := "UPDATE ACCOUNT"
+	btn2Style := updateProfileFromBlurBtnStyle.Padding(0, 3)
 	btn1 := updateProfileFromBlurBtnStyle.Render(s1)
-	btn2 := updateProfileFromBlurBtnStyle.Padding(0, 3).Render(s3)
 	if m.includePass {
 		btn1 = updateProfileFromBlurBtnStyle.Render(s2)
 	}
@@ -200,9 +245,14 @@ func (m UpdateProfileModel) renderFormBtns() string {
 			btn1 = updateProfileFormDangerBtnStyle.Render(s2)
 		}
 	case len(m.txtInputs) + 1:
-		btn2 = updateProfileFormActiveBtnStyle.Padding(0, 3).Render(s3)
+		btn2Style = updateProfileFormActiveBtnStyle.Padding(0, 3)
+	}
+	if m.spin {
+		s3 = m.spinner.View()
+		btn2Style = updateProfileFromBlurBtnStyle.Padding(0, 8).Background(primaryContrastColor)
 	}
 	btn1 = zone.Mark("formItem5", btn1)
+	btn2 := btn2Style.Render(s3)
 	btn2 = zone.Mark("formItem6", btn2)
 	btns := lipgloss.JoinHorizontal(lipgloss.Bottom, btn1, "  ", btn2)
 	if updateProfileWidth() < 50 {
@@ -316,5 +366,62 @@ func (m *UpdateProfileModel) removeAllErrors() {
 	maps.Clear(m.ev.Errors)
 	for i := range m.txtInputs {
 		m.txtInputs[i].Placeholder = ""
+	}
+}
+
+func (m *UpdateProfileModel) resetAllfields() {
+	for i := range m.txtInputs {
+		m.txtInputs[i].Reset()
+	}
+}
+
+func (m *UpdateProfileModel) populateServerErr(msg *domain.ErrValidation) {
+	if err, ok := msg.Errors["name"]; ok {
+		m.ev.AddError(m.errFieldTitles[0], err)
+		m.populateErr(0, err)
+	}
+	if err, ok := msg.Errors["email"]; ok {
+		m.ev.AddError(m.errFieldTitles[1], err)
+		m.populateErr(1, err)
+	}
+	if err, ok := msg.Errors["currentPassword"]; ok {
+		m.ev.AddError(m.errFieldTitles[2], err)
+		m.populateErr(2, err)
+	}
+}
+
+func (m *UpdateProfileModel) updateUser() tea.Cmd {
+	return func() tea.Msg {
+		u := domain.UserUpdate{
+			ID:    m.client.CurrentUsr.ID,
+			Name:  m.txtInputs[0].Value(),
+			Email: m.txtInputs[1].Value(),
+		}
+		curPass := m.txtInputs[2].Value()
+		newPass := m.txtInputs[4].Value()
+		if m.includePass {
+			u.CurrentPassword = &curPass
+			u.NewPassword = &newPass
+		}
+		ev, code, err := m.client.UpdateUser(u)
+		if code == http.StatusUnauthorized {
+			return requireAuthMsg{}
+		}
+		if code == http.StatusInternalServerError {
+			return errMsg{
+				err:  "the server is overwhelmed",
+				code: code,
+			}
+		}
+		if err != nil {
+			if errors.Is(err, client.ErrServerValidation) {
+				return ev
+			}
+			return errMsg{
+				err:  err.Error(),
+				code: code,
+			}
+		}
+		return doneMsg{}
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"github.com/M0hammadUsman/letschat/internal/api/utility"
 	"github.com/M0hammadUsman/letschat/internal/domain"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
@@ -98,6 +99,14 @@ func (s *UserService) UpdateUser(ctx context.Context, u *domain.UserUpdate) erro
 		return err
 	}
 	usr.Name = u.Name
+	exists, err := s.userRepository.ExistsUser(ctx, u.Email)
+	if err != nil {
+		return err
+	}
+	if exists && utility.ContextGetUser(ctx).Email != u.Email {
+		ev.AddError("email", "already exists")
+		return ev
+	}
 	usr.Email = u.Email
 	if u.CurrentPassword != nil {
 		if !comparePasswordHash(usr.Password, *u.CurrentPassword) {

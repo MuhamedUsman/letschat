@@ -341,11 +341,6 @@ func (m ConversationModel) getConversations() tea.Cmd {
 			if m.client.WsConnState.Get() == client.Connected {
 				renderState = true
 			}
-			/*if i == 0 { // add it to first idx
-				if m.selDiscUserConvo != nil && !containsSelConvo(convos, m.selDiscUserConvo.UserID) {
-					c = append(c, populateConvoItem(-1, m.selDiscUserConvo, renderState))
-				}
-			}*/
 			item := populateConvoItem(i, convo, renderState)
 			c = append(c, item)
 		}

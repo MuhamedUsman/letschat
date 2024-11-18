@@ -362,6 +362,14 @@ var ( // Update Profile Form Styles
 	updateProfileFormDangerBtnStyle = updateProfileFromBlurBtnStyle.
 					Background(dangerColor).
 					Foreground(whiteColor)
+
+	updateProfileFormSuccessStyle = lipgloss.NewStyle().
+					Foreground(greenColor).
+					MarginTop(2).
+					Align(lipgloss.Center).
+					Faint(true).
+					Italic(true).
+					SetString("Account settings updated successfully!")
 )
 
 var ( // Bunny Stying
