@@ -296,7 +296,7 @@ func (m *UpdateProfileModel) manageInputStylesAccordingly() {
 		for j, et := range m.errFieldTitles { // et -> errorTitle
 			if _, ok := m.ev.Errors[et]; ok {
 				m.inputFieldStyles[j].header = updateProfileInputHeaderDangerStyle
-				m.inputFieldStyles[j].field = updateProfileInputFieldDangerStyle
+				m.inputFieldStyles[j].field = updateProfileInputFieldDangerStyle.Width(updateProfileWidth() - 8)
 			}
 		}
 	}

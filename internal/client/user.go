@@ -17,6 +17,7 @@ import (
 
 // LoginState true -> successful login, false -> unauthorized requires login
 type LoginState bool
+
 type LoginBroadcaster = sync.Broadcaster[LoginState]
 
 func newLoginBroadcaster() *LoginBroadcaster {

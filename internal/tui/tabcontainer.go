@@ -126,12 +126,6 @@ func (m TabContainerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		default:
 		}
 
-	case client.LoginState:
-		if !msg {
-			// case requireAuthMsg will take over, also we again listen for state change
-			return m, tea.Batch(requireAuthCmd, m.readOnUsrLoggedInChan())
-		}
-
 	case requireAuthMsg:
 		// must unsubscribe before redirecting to some other model
 		m.unsubBroadcasts()
@@ -328,7 +322,9 @@ func (m *TabContainerModel) populateActiveTabContent() string {
 func (m TabContainerModel) readOnUsrLoggedInChan() tea.Cmd {
 	return func() tea.Msg {
 		for {
-			return <-m.lsb.ch
+			if !<-m.lsb.ch && m.client.WsConnState.Get() == client.Disconnected {
+				return requireAuthMsg{}
+			}
 		}
 	}
 }
