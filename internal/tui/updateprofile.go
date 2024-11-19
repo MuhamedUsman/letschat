@@ -331,15 +331,23 @@ func (m *UpdateProfileModel) setTxtInputWidthAccordingly() {
 func (m *UpdateProfileModel) validateTxtInputs() error {
 	// clear the previous errors
 	maps.Clear(m.ev.Errors)
+	validateEmptyField := true
 	for i := range m.txtInputs {
 		if !m.includePass && i == 2 {
 			break
 		}
+		// if password fields are not included, and only one of name/email is set, then if other is empty,
+		// validate its placeholder instead
+		if !m.includePass && (m.txtInputs[0].Value() != "" || m.txtInputs[1].Value() != "") {
+			validateEmptyField = false
+		}
 		switch i {
 		case 0, 1:
+			// if only password fields are included, and name/email are empty -> validate their placeholders instead
+			// if password fields are not included, and only one of name/email is set, then if other is empty,
+			// validate its placeholder instead
 			toValidate := m.txtInputs[i].Value()
-			// if only password fields are set, and name/email is not set, then validate the placeholders
-			if m.txtInputs[i].Value() == "" && m.includePass {
+			if (m.txtInputs[i].Value() == "" && m.includePass) || (!m.includePass && !validateEmptyField) {
 				toValidate = m.txtInputs[i].Placeholder
 			}
 			if i == 0 {
