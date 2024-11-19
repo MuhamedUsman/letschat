@@ -177,6 +177,13 @@ func (c *Client) UpdateUser(u domain.UserUpdate) (*domain.ErrValidation, int, er
 		return dev, res.StatusCode, ErrServerValidation
 
 	}
+
+	if res.StatusCode == http.StatusOK {
+		// this will re-fetch the current user and update it in the db and memory accordingly
+		// see client.manageUserLogins for more info
+		c.LoginState.Write(true)
+	}
+
 	return nil, res.StatusCode, nil
 }
 
@@ -235,7 +242,7 @@ func (c *Client) GetCurrentActiveUser() (*domain.User, int, error) {
 	return &response.User, resp.StatusCode, nil
 }
 
-// ManageUserLogins listens for state change on LoginBroadcaster, and on user login saves the user to db,
+// manageUserLogins listens for state change on LoginBroadcaster, and on user login saves the user to db,
 // if the user is not the one previously in the db, it will delete the db and creates a new one
 // ensuring brand-new db for a newly logged-in user, does this while deleting previous user if any
 func (c *Client) manageUserLogins(shtdwnCtx context.Context) {
