@@ -58,7 +58,7 @@ type ChatViewportModel struct {
 
 func InitialChatViewport(c *client.Client) ChatViewportModel {
 	token, ch := c.RecvMsgs.Subscribe()
-	return ChatViewportModel{
+	m := ChatViewportModel{
 		chatVp:          viewport.New(0, 0),
 		msgDialogVp:     viewport.New(0, 0),
 		msgs:            make([]*domain.Message, 0),
@@ -69,6 +69,7 @@ func InitialChatViewport(c *client.Client) ChatViewportModel {
 			token: token,
 		},
 	}
+	return m
 }
 
 func (m ChatViewportModel) Init() tea.Cmd {

@@ -22,28 +22,32 @@ type inputStyles struct {
 }
 
 type UpdateProfileModel struct {
-	inputTitles                                 []string
-	errFieldTitles                              []string
-	inputFieldStyles                            []inputStyles
-	txtInputs                                   []textinput.Model
-	placeholders                                []string
-	tabIdx                                      int
-	spinner                                     spinner.Model
-	spin, dangerState, includePass, showSuccess bool
-	ev                                          *domain.ErrValidation
-	client                                      *client.Client
+	inputTitles      []string
+	errFieldTitles   []string
+	inputFieldStyles []inputStyles
+	txtInputs        []textinput.Model
+	placeholders     []string
+	tabIdx           int
+	spinner          spinner.Model
+	ev               *domain.ErrValidation
+	client           *client.Client
+	// booleans for state management
+	spin, dangerState, includePass, showSuccess, populatePlaceholders bool
+	// to detect changes to currentUser name & email
+	prevName, prevEmail string
 }
 
 func NewUpdateProfileModel(c *client.Client) UpdateProfileModel {
 	up := UpdateProfileModel{
-		inputTitles:      []string{"Name", "Email", "Previous Password", "New Password", "Confirm Password"},
-		errFieldTitles:   []string{"name", "email", "prevPass", "newPass", "confirmPass"},
-		inputFieldStyles: make([]inputStyles, 5),
-		txtInputs:        make([]textinput.Model, 5),
-		tabIdx:           -1,
-		spinner:          newSpinner(),
-		ev:               domain.NewErrValidation(),
-		client:           c,
+		inputTitles:          []string{"Name", "Email", "Previous Password", "New Password", "Confirm Password"},
+		errFieldTitles:       []string{"name", "email", "prevPass", "newPass", "confirmPass"},
+		inputFieldStyles:     make([]inputStyles, 5),
+		txtInputs:            make([]textinput.Model, 5),
+		tabIdx:               -1,
+		populatePlaceholders: true,
+		spinner:              newSpinner(),
+		ev:                   domain.NewErrValidation(),
+		client:               c,
 	}
 
 	for i := range up.txtInputs {
@@ -75,6 +79,11 @@ func (m UpdateProfileModel) Init() tea.Cmd {
 
 func (m UpdateProfileModel) Update(msg tea.Msg) (UpdateProfileModel, tea.Cmd) {
 
+	if m.populatePlaceholders {
+		m.populateDefaultPlaceholders()
+		m.populatePlaceholders = false
+	}
+
 	switch msg := msg.(type) {
 
 	case tea.WindowSizeMsg:
@@ -92,7 +101,9 @@ func (m UpdateProfileModel) Update(msg tea.Msg) (UpdateProfileModel, tea.Cmd) {
 
 		case "esc":
 			m.tabIdx = -1
+			m.includePass = false
 			m.removeAllErrors()
+			m.populateDefaultPlaceholders()
 			return m, m.focusTxtInputsAccordingly()
 
 		case "enter":
@@ -158,6 +169,8 @@ func (m UpdateProfileModel) Update(msg tea.Msg) (UpdateProfileModel, tea.Cmd) {
 		m.includePass = false
 		m.showSuccess = true
 		m.tabIdx = -1
+		// TODO: below op fetches the prev user placeholders
+		m.populateDefaultPlaceholders()
 		return m, countdownShowSuccessCmd()
 
 	case hideSuccessMsg:
@@ -198,10 +211,15 @@ func newSpinner() spinner.Model {
 	return s
 }
 
-func (m *UpdateProfileModel) populateDefaultFields() {
-	if m.client.CurrentUsr != nil {
-		m.txtInputs[0].SetValue(m.client.CurrentUsr.Name)
-		m.txtInputs[1].SetValue(m.client.CurrentUsr.Email)
+func (m *UpdateProfileModel) populateDefaultPlaceholders() {
+	for m.client.CurrentUsr != nil { // the loop max runs for 2 iterations, tested it
+		m.txtInputs[0].Placeholder = m.client.CurrentUsr.Name
+		m.prevName = m.client.CurrentUsr.Name
+		m.txtInputs[1].Placeholder = m.client.CurrentUsr.Email
+		m.prevEmail = m.client.CurrentUsr.Email
+		if m.client.CurrentUsr != nil {
+			break
+		}
 	}
 }
 
@@ -318,10 +336,17 @@ func (m *UpdateProfileModel) validateTxtInputs() error {
 			break
 		}
 		switch i {
-		case 0:
-			domain.ValidateName(m.txtInputs[i].Value(), m.ev)
-		case 1:
-			domain.ValidateEmail(m.txtInputs[i].Value(), m.ev)
+		case 0, 1:
+			toValidate := m.txtInputs[i].Value()
+			// if only password fields are set, and name/email is not set, then validate the placeholders
+			if m.txtInputs[i].Value() == "" && m.includePass {
+				toValidate = m.txtInputs[i].Placeholder
+			}
+			if i == 0 {
+				domain.ValidateName(toValidate, m.ev)
+			} else {
+				domain.ValidateEmail(toValidate, m.ev)
+			}
 		case 2, 3, 4:
 			domain.ValidPlainPasswordWithKey(m.txtInputs[i].Value(), m.ev, m.errFieldTitles[i])
 		}
@@ -354,7 +379,14 @@ func (m *UpdateProfileModel) removeErrAccordingToTabIdx() {
 	if m.ev.HasErrors() {
 		for i, et := range m.errFieldTitles {
 			if m.txtInputs[i].Focused() {
-				m.txtInputs[i].Placeholder = ""
+				if i == 0 {
+					m.txtInputs[i].Placeholder = m.client.CurrentUsr.Name
+				} else if i == 1 {
+					m.txtInputs[i].Placeholder = m.client.CurrentUsr.Email
+				} else {
+					m.txtInputs[i].Placeholder = ""
+				}
+				m.txtInputs[i].PlaceholderStyle = lipgloss.NewStyle().Foreground(primarySubtleDarkColor)
 				delete(m.ev.Errors, et)
 				break
 			}
@@ -366,6 +398,7 @@ func (m *UpdateProfileModel) removeAllErrors() {
 	maps.Clear(m.ev.Errors)
 	for i := range m.txtInputs {
 		m.txtInputs[i].Placeholder = ""
+		m.txtInputs[i].PlaceholderStyle = lipgloss.NewStyle().Foreground(primarySubtleDarkColor)
 	}
 }
 
@@ -396,6 +429,12 @@ func (m *UpdateProfileModel) updateUser() tea.Cmd {
 			ID:    m.client.CurrentUsr.ID,
 			Name:  m.txtInputs[0].Value(),
 			Email: m.txtInputs[1].Value(),
+		}
+		if u.Name == "" {
+			u.Name = m.client.CurrentUsr.Name
+		}
+		if u.Email == "" {
+			u.Email = m.client.CurrentUsr.Email
 		}
 		curPass := m.txtInputs[2].Value()
 		newPass := m.txtInputs[4].Value()
