@@ -21,7 +21,6 @@ type inputStyles struct {
 	field  lipgloss.Style
 }
 
-// Adding comment to check if the commit gets verified
 type UpdateProfileModel struct {
 	inputTitles      []string
 	errFieldTitles   []string
