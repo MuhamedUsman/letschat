@@ -37,6 +37,19 @@ func (r LocalUserRepository) SaveCurrentUser(u *domain.User) error {
 	return err
 }
 
+func (r LocalUserRepository) UpdateCurrentUser(u *domain.User) error {
+	query := `
+		UPDATE users
+		SET id = :id,
+		    name = :name, 
+		    email = :email,
+		    created_at = :created_at
+		WHERE id = :id
+	`
+	_, err := r.db.NamedExec(query, u)
+	return err
+}
+
 func (r LocalUserRepository) DeletePreviousUser() error {
 	query := `
 		DELETE FROM users

@@ -164,12 +164,11 @@ func (m UpdateProfileModel) Update(msg tea.Msg) (UpdateProfileModel, tea.Cmd) {
 
 	case doneMsg:
 		m.spin = false
-		m.spinner = newSpinner()
+		m.spinner = newSpinner() // reset spinner
 		m.resetAllfields()
 		m.includePass = false
 		m.showSuccess = true
 		m.tabIdx = -1
-		// TODO: below op fetches the prev user placeholders
 		m.populateDefaultPlaceholders()
 		return m, countdownShowSuccessCmd()
 

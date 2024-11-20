@@ -180,9 +180,21 @@ func (c *Client) UpdateUser(u domain.UserUpdate) (*domain.ErrValidation, int, er
 	}
 
 	if res.StatusCode == http.StatusOK {
-		// this will re-fetch the current user and update it in the db and memory accordingly
-		// see client.manageUserLogins for more info
-		c.LoginState.Write(true)
+		// get and update the user
+		usr, _, _ := c.GetCurrentActiveUser()
+		c.CurrentUsr = usr
+		var retrievedUsr *domain.User
+		retrievedUsr, err = c.repo.GetCurrentUser()
+		if err != nil {
+			slog.Error(err.Error())
+			return nil, 0, ErrApplication
+		}
+		retrievedUsr.Name = usr.Name
+		retrievedUsr.Email = usr.Email
+		if err = c.repo.UpdateCurrentUser(retrievedUsr); err != nil {
+			slog.Error(err.Error())
+			return nil, 0, ErrApplication
+		}
 	}
 
 	return nil, res.StatusCode, nil
