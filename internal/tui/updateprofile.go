@@ -32,7 +32,7 @@ type UpdateProfileModel struct {
 	ev               *domain.ErrValidation
 	client           *client.Client
 	// booleans for state management
-	spin, dangerState, includePass, showSuccess, populatePlaceholders bool
+	spin, dangerState, includePass, showSuccess, populatePlaceholders, focus bool
 	// to detect changes to currentUser name & email
 	prevName, prevEmail string
 }
@@ -93,11 +93,14 @@ func (m UpdateProfileModel) Update(msg tea.Msg) (UpdateProfileModel, tea.Cmd) {
 		switch msg.String() {
 
 		case "tab":
-			if !m.includePass && m.tabIdx == 1 {
-				m.tabIdx = 4
+			if m.focus {
+				// if pass is not included, then after email field, goto first button
+				if !m.includePass && m.tabIdx == 1 {
+					m.tabIdx = 4
+				}
+				m.tabIdx = (m.tabIdx + 1) % (len(m.inputTitles) + 2)
+				m.focusTxtInputsAccordingly()
 			}
-			m.tabIdx = (m.tabIdx + 1) % (len(m.inputTitles) + 2)
-			m.focusTxtInputsAccordingly()
 
 		case "esc":
 			m.tabIdx = -1

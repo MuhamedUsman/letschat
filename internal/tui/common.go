@@ -24,10 +24,6 @@ type doneMsg struct{}
 
 type requireAuthMsg struct{}
 
-func requireAuthCmd() tea.Msg {
-	return requireAuthMsg{}
-}
-
 type spinMsg struct{}
 
 func spinnerSpinCmd() tea.Msg { return spinMsg{} }
@@ -69,3 +65,8 @@ func countdownShowSuccessCmd() tea.Cmd {
 		return hideSuccessMsg{}
 	}
 }
+
+type msgSentMsg struct{}
+
+// Once this is sent ConversationModel will read on it to save the conversation, if not exists
+func msgSentCmd() tea.Msg { return msgSentMsg{} }
