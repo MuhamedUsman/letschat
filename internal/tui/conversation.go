@@ -113,10 +113,6 @@ func (m ConversationModel) Update(msg tea.Msg) (ConversationModel, tea.Cmd) {
 			return m, tea.Batch(m.conversationList.FilterInput.Focus(), m.handleConversationListUpdate(msg))
 		case "ctrl+t":
 			m.conversationList.FilterInput.Blur()
-		case "ctrl+s": // create the convo if the selDiscUserConvo does not exist
-			if m.selDiscUserConvo != nil {
-				return m, m.createConvoIfNotExist()
-			}
 		case "esc":
 			m.conversationList.FilterInput.Blur()
 		}
@@ -195,6 +191,12 @@ func (m ConversationModel) Update(msg tea.Msg) (ConversationModel, tea.Cmd) {
 		cmd := m.conversationList.InsertItem(0, populateConvoItem(0, convo, renderState))
 		return m, cmd
 
+	case msgSentMsg: // create the convo if the selDiscUserConvo does not exist
+		if m.selDiscUserConvo != nil {
+			return m, m.createConvoIfNotExist()
+		}
+
+		// TODO: Once a new user is selected from discover tab, message is sent, the conversation does not show the message in the conversations
 	case createdConvoMsg:
 		renderState := false
 		if m.client.WsConnState.Get() == client.Connected {
