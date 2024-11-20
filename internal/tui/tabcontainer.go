@@ -261,11 +261,14 @@ func renderErrContainer(err string, code int, timer string) string {
 func (m *TabContainerModel) setChildModelFocus() {
 	m.discover.focus = false
 	m.letschat.focus = false
+	m.preferences.focus = false
 	switch m.activeTab {
 	case 0:
 		m.discover.focus = true
 	case 1:
 		m.letschat.focus = true
+	case 2:
+		m.preferences.focus = true
 	}
 }
 

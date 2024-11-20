@@ -77,7 +77,7 @@ func (m ChatModel) Update(msg tea.Msg) (ChatModel, tea.Cmd) {
 				return m, nil
 			}
 			m.chatTxtarea.Reset()
-			return m, tea.Batch(m.sendMessage(s), m.handleChatTextareaUpdate(msg), m.handleChatViewportUpdate(msg))
+			return m, tea.Batch(m.sendMessage(s), m.handleChatTextareaUpdate(msg), m.handleChatViewportUpdate(msg), msgSentCmd)
 		case "left":
 			if m.menuBtnIdx == 1 {
 				m.menuBtnIdx--
