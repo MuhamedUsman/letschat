@@ -325,7 +325,7 @@ func (m *TabContainerModel) populateActiveTabContent() string {
 func (m TabContainerModel) readOnUsrLoggedInChan() tea.Cmd {
 	return func() tea.Msg {
 		for {
-			if flag, ok := <-m.lsb.ch; ok && bool(flag) {
+			if flag, ok := <-m.lsb.ch; ok && bool(!flag) {
 				return requireAuthMsg{}
 			}
 		}
