@@ -11,7 +11,6 @@ import (
 	"log/slog"
 	"net/http"
 	"slices"
-	"time"
 )
 
 type Convos []*domain.Conversation
@@ -115,16 +114,14 @@ func (c *Client) populateConvosWithLatestMsgs(convos []*domain.Conversation) []*
 	return convos
 }
 
-func (c *Client) CreateConvoIfNotExist(convo *domain.Conversation) (*domain.Conversation, error) {
-	if _, err := c.repo.GetConversationByUserID(convo.UserID); err != nil {
+func (c *Client) conversationExistsWithReceiver(receiverID string) (bool, error) {
+	if _, err := c.repo.GetConversationByUserID(receiverID); err != nil {
 		if errors.Is(err, domain.ErrRecordNotFound) {
-			// we need to create a new convo
-			convo.LastOnline = ptr(time.Now())
-			return convo, c.repo.SaveConversations(convo)
+			return false, nil
 		}
-		return nil, err
+		return false, err
 	}
-	return nil, nil
+	return true, nil
 }
 
 func (c *Client) saveConvosAndWriteToChan(convos []*domain.Conversation) {

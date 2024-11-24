@@ -12,10 +12,13 @@ const (
 	letschatChat         = "letschatChat"
 )
 
+// global for performance reasons, and ease of logic
 var (
-	// selected user from conversations, global for performance reasons
+	// selected user from conversations
 	selUserID, selUsername string
 	selUserTyping          bool
+	// if false msg will not be sent, and ConversationModel will not call for createConvoIfNotExist()
+	validMsgForSend bool
 )
 
 type LetschatModel struct {

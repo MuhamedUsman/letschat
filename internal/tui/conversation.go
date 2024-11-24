@@ -154,11 +154,10 @@ func (m ConversationModel) Update(msg tea.Msg) (ConversationModel, tea.Cmd) {
 		}
 
 	case []list.Item:
-		// m.getConversations() so we can read again for updated conversations
 		return m, tea.Batch(
 			m.conversationList.SetItems(msg),
 			spinnerResetCmd,
-			m.getConversations(),
+			m.getConversations(), //so we can read again for updated conversations
 			m.conversationList.NewStatusMessage("Updated Conversations"),
 		)
 
@@ -189,22 +188,6 @@ func (m ConversationModel) Update(msg tea.Msg) (ConversationModel, tea.Cmd) {
 			renderState = true
 		}
 		cmd := m.conversationList.InsertItem(0, populateConvoItem(0, convo, renderState))
-		return m, cmd
-
-	case msgSentMsg: // create the convo if the selDiscUserConvo does not exist
-		if m.selDiscUserConvo != nil {
-			return m, m.createConvoIfNotExist()
-		}
-
-		// TODO: Once a new user is selected from discover tab, message is sent, the conversation does not show the message in the conversations
-	case createdConvoMsg:
-		renderState := false
-		if m.client.WsConnState.Get() == client.Connected {
-			renderState = true
-		}
-		// after the convo is created in the db, we remove it from here, now the getConversation() will show it
-		m.selDiscUserConvo = nil
-		cmd := m.conversationList.InsertItem(0, populateConvoItem(0, msg, renderState))
 		return m, cmd
 	}
 
@@ -370,17 +353,4 @@ func (m ConversationModel) getSelConvoUsername() string {
 	}
 	fv := m.conversationList.SelectedItem().FilterValue()
 	return strings.Split(fv, "|")[0]
-}
-
-func (m ConversationModel) createConvoIfNotExist() tea.Cmd {
-	return func() tea.Msg {
-		createdConvo, err := m.client.CreateConvoIfNotExist(m.selDiscUserConvo)
-		if err != nil {
-			return &errMsg{err: "Unable to create the conversation", code: 0}
-		}
-		if createdConvo != nil {
-			return createdConvoMsg(createdConvo)
-		}
-		return nil
-	}
 }

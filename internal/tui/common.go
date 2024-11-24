@@ -54,8 +54,6 @@ type deleteMsgSuccess string // stores id of the deleted msg, remove msg with th
 
 type clearConvoSuccess struct{}
 
-type createdConvoMsg *domain.Conversation
-
 type hideSuccessMsg struct{}
 
 func countdownShowSuccessCmd() tea.Cmd {
@@ -65,8 +63,3 @@ func countdownShowSuccessCmd() tea.Cmd {
 		return hideSuccessMsg{}
 	}
 }
-
-type msgSentMsg struct{}
-
-// Once this is sent ConversationModel will read on it to save the conversation, if not exists
-func msgSentCmd() tea.Msg { return msgSentMsg{} }

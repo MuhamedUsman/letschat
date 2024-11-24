@@ -7,6 +7,7 @@ import (
 	"github.com/M0hammadUsman/letschat/internal/domain"
 	"github.com/M0hammadUsman/letschat/internal/sync"
 	"log/slog"
+	"net/http"
 	"time"
 )
 
@@ -47,6 +48,28 @@ func (c *Client) SendMessage(msg domain.Message) error {
 	if err := c.repo.SaveMsg(&msg); err != nil {
 		slog.Error(err.Error())
 	}
+	// check if the conversation doesn't exist locally, the server will make one, so re-fetch convos and populate
+	exists, err := c.conversationExistsWithReceiver(msg.ReceiverID)
+	if err != nil {
+		err = fmt.Errorf("checking if conversation exists for this receiver after saving sent msg, err=\"%v\"", err)
+		slog.Error(err.Error())
+		return err
+	}
+	if !exists {
+		var convos []*domain.Conversation
+		var code int
+		convos, code, err = c.getConversations()
+		if err != nil {
+			err = fmt.Errorf("fetching conversation after saving sent msg, err=\"%v\"", err)
+		}
+		if code == http.StatusUnauthorized {
+			c.LoginState.Write(false) // user will be redirected to log-in by tui
+			return nil
+		}
+		c.saveConvosAndWriteToChan(convos)
+		return nil
+	}
+	// if exists get from db and populate convos
 	convos, _ := c.repo.GetConversations()
 	c.populateConvosWithLatestMsgs(convos)
 	_ = c.repo.DeleteAllConversations()
