@@ -71,10 +71,7 @@ func (c *Client) SendMessage(msg domain.Message) error {
 	}
 	// if exists get from db and populate convos
 	convos, _ := c.repo.GetConversations()
-	c.populateConvosWithLatestMsgs(convos)
-	_ = c.repo.DeleteAllConversations()
-	_ = c.repo.SaveConversations(convos...)
-	c.Conversations.Write(convos)
+	c.saveConvosAndWriteToChan(convos)
 	return nil
 }
 

@@ -113,6 +113,10 @@ func (m ConversationModel) Update(msg tea.Msg) (ConversationModel, tea.Cmd) {
 			return m, tea.Batch(m.conversationList.FilterInput.Focus(), m.handleConversationListUpdate(msg))
 		case "ctrl+t":
 			m.conversationList.FilterInput.Blur()
+		case "ctrl+s":
+			if validMsgForSend {
+				m.selDiscUserConvo = nil
+			}
 		case "esc":
 			m.conversationList.FilterInput.Blur()
 		}

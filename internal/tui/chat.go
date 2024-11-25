@@ -73,11 +73,14 @@ func (m ChatModel) Update(msg tea.Msg) (ChatModel, tea.Cmd) {
 		case "ctrl+s":
 			s := m.chatTxtarea.Value()
 			s = strings.TrimSpace(s)
-			if s == "" { // empty msg
+			validMsgForSend = s != ""
+			if !validMsgForSend {
 				return m, nil
 			}
 			m.chatTxtarea.Reset()
 			return m, tea.Batch(m.sendMessage(s), m.handleChatTextareaUpdate(msg), m.handleChatViewportUpdate(msg))
+		case "ctrl+o":
+			m.menuBtnIdx = 0
 		case "left":
 			if m.menuBtnIdx == 1 {
 				m.menuBtnIdx--

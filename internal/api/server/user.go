@@ -62,6 +62,8 @@ func (s *Server) UpdateUserHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+	// TODO: once everything is done, send the updated user's conversations a msg to re-fetch conversations
+
 }
 
 func (s *Server) ActivateUserHandler(w http.ResponseWriter, r *http.Request) {

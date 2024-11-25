@@ -102,6 +102,16 @@ func (m UpdateProfileModel) Update(msg tea.Msg) (UpdateProfileModel, tea.Cmd) {
 				m.focusTxtInputsAccordingly()
 			}
 
+		case "shift+tab":
+			if m.focus {
+				l := len(m.inputTitles) + 2
+				m.tabIdx = (m.tabIdx - 1 + l) % l
+				if !m.includePass && m.tabIdx == 4 {
+					m.tabIdx = 1
+				}
+				m.focusTxtInputsAccordingly()
+			}
+
 		case "esc":
 			m.tabIdx = -1
 			m.includePass = false

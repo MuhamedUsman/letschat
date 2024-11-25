@@ -6,7 +6,6 @@ import (
 	"time"
 )
 
-// MsgOperation must not have math.MinInt8 value
 type MsgOperation int
 
 const (
@@ -34,6 +33,10 @@ const (
 	OfflineMsg
 	// TypingMsg indicates the user is typing; a msg with this OP must not be persisted
 	TypingMsg
+	// SyncConvosMsg tells the users to re-fetch their conversations from the server
+	// not to be persisted, as we only want to send this for conversations' online users
+	// offline ones will fetch from the server, when the TUI starts
+	SyncConvosMsg
 )
 
 var (

@@ -119,6 +119,7 @@ func (m ChatViewportModel) Update(msg tea.Msg) (ChatViewportModel, tea.Cmd) {
 	switch msg := msg.(type) {
 
 	case tea.WindowSizeMsg:
+		m.updateDimensions()
 		m.chatVp.SetContent(m.renderChatViewport())
 		return m, tea.Batch(m.handleChatViewportUpdate(msg), m.handleMsgDialogViewportUpdate(msg))
 

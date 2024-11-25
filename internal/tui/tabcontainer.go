@@ -42,9 +42,9 @@ type TabContainerModel struct {
 
 func InitialTabContainerModel() TabContainerModel {
 	t := []string{
-		"🔎 Discover",
-		"💭 Conversations",
-		"⚙️ Preferences",
+		"🔎 DISCOVER",
+		"💭 CONVERSATIONS",
+		"⚙️ PREFERENCES",
 	}
 	c := client.Get()
 	s := spinner.New(spinner.WithStyle(spinnerStyle), spinner.WithSpinner(spinner.Points))
@@ -100,12 +100,6 @@ func (m TabContainerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				slog.Error(err.Error())
 			}
 			return m, tea.Quit
-		case "shift+tab":
-			if m.activeTab == len(m.tabs)-1 {
-				m.activeTab = 0
-			} else {
-				m.activeTab++
-			}
 		case "enter":
 			if !m.timer.Timedout() {
 				return m, nil
@@ -113,6 +107,14 @@ func (m TabContainerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "esc":
 			m.errMsg = nil
 			m.timer.Timeout = 0 * time.Second
+		case "ctrl+right", "ctrl+r":
+			if m.activeTab+1 < len(m.tabs) {
+				m.activeTab++
+			}
+		case "ctrl+left", "ctrl+l":
+			if m.activeTab-1 >= 0 {
+				m.activeTab--
+			}
 		}
 
 	case tea.MouseMsg:
