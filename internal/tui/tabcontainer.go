@@ -210,9 +210,9 @@ func renderLeftText(txt string, s client.WsConnState) string {
 	switch s {
 	case client.Disconnected:
 		is = is.Foreground(redColor)
-	case client.WaitingForReconnection:
+	case client.WaitingForConnection:
 		is = is.Foreground(redColor).Blink(true)
-	case client.Reconnecting:
+	case client.Connecting:
 		is = is.Foreground(orangeColor).Blink(true)
 	case client.Connected:
 		is = is.Foreground(greenColor)

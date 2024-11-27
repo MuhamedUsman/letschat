@@ -19,8 +19,8 @@ type WsConnState int
 
 const (
 	Disconnected WsConnState = iota - 1
-	WaitingForReconnection
-	Reconnecting
+	WaitingForConnection
+	Connecting
 	Connected
 )
 
@@ -108,23 +108,20 @@ func (c *Client) handleSentMessages(conn *websocket.Conn, shtdwnCtx context.Cont
 }
 
 // AttemptWsReconnectOnDisconnect must be run in a separate go routine, principal -> finite state machine
-// Why not reconnect from WsConnectAndListenForMessages method, the reason is,
-// we'll only get disconnect error once we try to write to this conn,
-// and also we use this chan to read and communicate to the user in TUI what is happening in the background
 func (c *Client) attemptWsReconnectOnDisconnect(shtdwnCtx context.Context) {
 	token, ch := c.WsConnState.Subscribe()
 	defer c.WsConnState.Unsubscribe(token)
 	attempt := 1
 	maxAttempts := 5
-	maxDelay := 30 * time.Second
+	maxDelay := 40 * time.Second
 	for {
 		select {
 		case s := <-ch:
 			// we switch on the s, so we can attempt a reconnect while skipping the backoff time if need be
 			switch s {
 			case Disconnected:
-				c.WsConnState.Write(WaitingForReconnection)
-			case WaitingForReconnection:
+				c.WsConnState.Write(WaitingForConnection)
+			case WaitingForConnection:
 				// After 5th retry
 				if attempt == maxAttempts {
 					c.WsConnState.Write(Disconnected)
@@ -135,12 +132,12 @@ func (c *Client) attemptWsReconnectOnDisconnect(shtdwnCtx context.Context) {
 				t := time.NewTimer(expbackoff)
 				select {
 				case <-t.C:
-					c.WsConnState.Write(Reconnecting)
+					c.WsConnState.Write(Connecting)
 				case <-shtdwnCtx.Done():
 					// stop on timer is not necessary after go 1.23
 					return
 				}
-			case Reconnecting:
+			case Connecting:
 				go c.wsConnectAndListenForMessages(shtdwnCtx)
 				attempt++
 			case Connected:
