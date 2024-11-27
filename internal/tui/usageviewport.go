@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"github.com/M0hammadUsman/letschat/internal/tui/embed"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glamour"
@@ -8,15 +9,17 @@ import (
 )
 
 type UsageViewportModel struct {
-	vp    viewport.Model
-	focus bool
+	vp         viewport.Model
+	usageFiles *embed.EmbeddedFiles
+	focus      bool
 }
 
 func NewUsageViewportModel() UsageViewportModel {
-	vp := viewport.New(50, 32)
+	vp := viewport.New(50, 30)
 	vp.MouseWheelEnabled = true
 	return UsageViewportModel{
-		vp: vp,
+		vp:         vp,
+		usageFiles: embed.EmbeddedFilesInstance(),
 	}
 }
 
@@ -27,11 +30,11 @@ func (m UsageViewportModel) Init() tea.Cmd {
 func (m UsageViewportModel) Update(msg tea.Msg) (UsageViewportModel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		g, err := glamour.NewTermRenderer(glamour.WithAutoStyle())
+		g, err := glamour.NewTermRenderer(glamour.WithStylesFromJSONBytes(m.usageFiles.UsageTheme))
 		if err != nil {
 			slog.Error(err.Error())
 		}
-		md, err := g.Render(usage())
+		md, err := g.Render(string(m.usageFiles.UsageFile))
 		if err != nil {
 			slog.Error(err.Error())
 		}
