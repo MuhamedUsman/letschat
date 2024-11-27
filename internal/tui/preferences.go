@@ -32,24 +32,18 @@ func (m PreferencesModel) Init() tea.Cmd {
 }
 
 func (m PreferencesModel) Update(msg tea.Msg) (PreferencesModel, tea.Cmd) {
+
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "tab":
-			if m.focus {
-				m.up.focus = true
-			}
-		}
+		m.up.focus = m.focus
 	case tea.MouseMsg:
 		m.up.focus = false
 		m.usageVp.focus = false
-		if m.focus {
-			if zone.Get(updateProfile).InBounds(msg) {
-				m.up.focus = true
-			}
-			if zone.Get(usageVp).InBounds(msg) {
-				m.usageVp.focus = true
-			}
+		if zone.Get(updateProfile).InBounds(msg) {
+			m.up.focus = true
+		}
+		if zone.Get(usageVp).InBounds(msg) {
+			m.usageVp.focus = true
 		}
 	}
 	return m, tea.Batch(m.handleUsageViewportUpdate(msg), m.handleUpdateProfileModelUpdate(msg))

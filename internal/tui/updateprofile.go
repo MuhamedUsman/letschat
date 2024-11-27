@@ -84,6 +84,11 @@ func (m UpdateProfileModel) Update(msg tea.Msg) (UpdateProfileModel, tea.Cmd) {
 		m.populatePlaceholders = false
 	}
 
+	if !m.focus {
+		m.resetForm()
+		m.focusTxtInputsAccordingly()
+	}
+
 	switch msg := msg.(type) {
 
 	case tea.WindowSizeMsg:
@@ -113,11 +118,8 @@ func (m UpdateProfileModel) Update(msg tea.Msg) (UpdateProfileModel, tea.Cmd) {
 			}
 
 		case "esc":
-			m.tabIdx = -1
-			m.includePass = false
-			m.removeAllErrors()
-			m.populateDefaultPlaceholders()
-			return m, m.focusTxtInputsAccordingly()
+			m.resetForm()
+			m.focusTxtInputsAccordingly()
 
 		case "enter":
 			switch m.tabIdx {
@@ -210,7 +212,7 @@ func (m UpdateProfileModel) View() string {
 	title := sectionTitleStyle.Render("Account Settings")
 	title = lipgloss.PlaceHorizontal(updateProfileWidth(), lipgloss.Center, title)
 	form := updateProfileFormStyle.Render(m.renderForm())
-	c := lipgloss.NewStyle().Width(updateProfileWidth())
+	c := lipgloss.NewStyle().Width(updateProfileWidth()).Height(conversationHeight())
 	return c.Render(title, form)
 }
 
@@ -326,7 +328,7 @@ func (m *UpdateProfileModel) focusTxtInputsAccordingly() tea.Cmd {
 	var cmd tea.Cmd
 	for i := range m.txtInputs {
 		m.txtInputs[i].Blur()
-		if m.tabIdx == i {
+		if m.tabIdx == i && m.focus {
 			cmd = m.txtInputs[i].Focus()
 		}
 	}
@@ -412,6 +414,13 @@ func (m *UpdateProfileModel) removeErrAccordingToTabIdx() {
 			}
 		}
 	}
+}
+
+func (m *UpdateProfileModel) resetForm() {
+	m.tabIdx = -1
+	m.includePass = false
+	m.removeAllErrors()
+	m.populateDefaultPlaceholders()
 }
 
 func (m *UpdateProfileModel) removeAllErrors() {

@@ -205,7 +205,6 @@ func (m ChatViewportModel) Update(msg tea.Msg) (ChatViewportModel, tea.Cmd) {
 					break
 				}
 			}
-			return m, nil
 		}
 
 		if m.selMsgId != nil && msg.Button == tea.MouseButtonLeft {
@@ -482,7 +481,6 @@ func renderDeleteBtn(focus bool, btnTxt string) string {
 		Render(btnTxt)
 }
 
-// getSelectedMsgFromMsgSlice
 func (m *ChatViewportModel) getSelMsgFromMsgSlice() *domain.Message {
 	for _, msg := range m.msgs {
 		if m.selMsgId != nil && msg.ID == *m.selMsgId {

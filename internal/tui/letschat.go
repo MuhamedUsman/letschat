@@ -41,13 +41,16 @@ func (m LetschatModel) Init() tea.Cmd {
 }
 
 func (m LetschatModel) Update(msg tea.Msg) (LetschatModel, tea.Cmd) {
+
 	switch msg := msg.(type) {
 	case tea.MouseMsg:
-		if zone.Get(letschatConversation).InBounds(msg) {
+		m.conversation.focus = false
+		m.chat.focus = false
+		if zone.Get(letschatConversation).InBounds(msg) && m.focus {
 			m.conversation.focus = true
 			m.chat.focus = false
 
-		} else if zone.Get(letschatChat).InBounds(msg) {
+		} else if zone.Get(letschatChat).InBounds(msg) && m.focus {
 			m.chat.focus = true
 			m.conversation.focus = false
 		}

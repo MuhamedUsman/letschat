@@ -5,21 +5,23 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glamour"
-	"log/slog"
 )
 
 type UsageViewportModel struct {
-	vp         viewport.Model
-	usageFiles *embed.EmbeddedFiles
-	focus      bool
+	vp    viewport.Model
+	focus bool
 }
 
 func NewUsageViewportModel() UsageViewportModel {
-	vp := viewport.New(50, 30)
-	vp.MouseWheelEnabled = true
+	usageFiles := embed.EmbeddedFilesInstance()
+	g, _ := glamour.NewTermRenderer(glamour.WithStylesFromJSONBytes(usageFiles.UsageTheme))
+	usage, _ := g.Render(string(usageFiles.UsageFile))
+
+	vp := viewport.New(0, 0)
+	vp.SetContent(usage)
+
 	return UsageViewportModel{
-		vp:         vp,
-		usageFiles: embed.EmbeddedFilesInstance(),
+		vp: vp,
 	}
 }
 
@@ -28,21 +30,17 @@ func (m UsageViewportModel) Init() tea.Cmd {
 }
 
 func (m UsageViewportModel) Update(msg tea.Msg) (UsageViewportModel, tea.Cmd) {
+	if _, ok := msg.(tea.WindowSizeMsg); ok {
+		m.updateVPDimensions()
+		m.vp.GotoBottom()
+	}
 	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		g, err := glamour.NewTermRenderer(glamour.WithStylesFromJSONBytes(m.usageFiles.UsageTheme))
-		if err != nil {
-			slog.Error(err.Error())
+	case tea.MouseButton:
+		if msg == tea.MouseButtonWheelUp {
+			m.vp.LineUp(5)
 		}
-		md, err := g.Render(string(m.usageFiles.UsageFile))
-		if err != nil {
-			slog.Error(err.Error())
-		}
-		m.vp.SetContent(md)
-
-	case tea.KeyMsg:
-		switch msg.String() {
-
+		if msg == tea.MouseButtonWheelDown {
+			m.vp.LineDown(5)
 		}
 	}
 	return m, nil
@@ -54,7 +52,7 @@ func (m UsageViewportModel) View() string {
 
 // Helpers & Stuff -----------------------------------------------------------------------------------------------------
 
-/*func (m *UsageViewportModel) updateVPDimensions() {
-	m.msgVP.Width = lipgloss.Width(s) + 4
-	m.msgVP.Height = terminalHeight - 4
-}*/
+func (m *UsageViewportModel) updateVPDimensions() {
+	m.vp.Width = usageWidth()
+	m.vp.Height = conversationHeight() - 1
+}

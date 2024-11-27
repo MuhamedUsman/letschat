@@ -191,7 +191,8 @@ var ( // Conversation Styling
 	// updated by TabContainerModel so we can keep the verticalDivider proportional to the gap
 	tabGapLeftWidth int
 
-	conversationWidth  = func() int { return tabGapLeftWidth - 1 }
+	conversationWidth = func() int { return tabGapLeftWidth - 1 }
+	// its simply vertical space between main container view, so can be used by different components to render height
 	conversationHeight = func() int { return terminalHeight - 4 }
 
 	conversationContainerStyle = lipgloss.NewStyle().
