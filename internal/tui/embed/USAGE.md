@@ -28,10 +28,10 @@
 ---
 # ⚙️ PREFERENCES TAB
 ### ACCOUNT SETTINGS FORM
-- MOVE FR-WARD  ⇒ `TAB`
-- MOVE BK-WARD  ⇒ `SHIFT + TAB`
-- SELECT FIELD  ⇒ `LEFT CLICK`
-- MOVE IN BTNS  ⇒ `↑` `←` `→` `↓`
+- MOVE FR-WARD ⇒  `TAB`
+- MOVE BK-WARD ⇒  `SHIFT + TAB`
+- SELECT FIELD ⇒  `LEFT CLICK`
+- MOVE IN BTNS ⇒  `↑` `←` `→` `↓`
 ---
 **NOTE:** _To press a button, hit_ `ENTER`
 

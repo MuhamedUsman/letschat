@@ -32,13 +32,12 @@ func (m PreferencesModel) Init() tea.Cmd {
 }
 
 func (m PreferencesModel) Update(msg tea.Msg) (PreferencesModel, tea.Cmd) {
-
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		m.up.focus = m.focus
 	case tea.MouseMsg:
-		m.up.focus = false
 		m.usageVp.focus = false
+		m.up.focus = false
 		if zone.Get(updateProfile).InBounds(msg) {
 			m.up.focus = true
 		}
