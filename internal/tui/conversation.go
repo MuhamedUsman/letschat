@@ -7,10 +7,11 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/textinput"
+	"github.com/charmbracelet/bubbles/timer"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	zone "github.com/lrstanley/bubblezone"
-	"slices"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -32,16 +33,25 @@ type ConversationModel struct {
 	// so if there is dynamic changes to the conversation list, we first check if the selDiscUser is not nil
 	// then we add that user in the top of the list
 	selDiscUserConvo *domain.Conversation
+	selConvoItemIdx  int
 	// there is no built-in functionality for list focus as far as I scanned the docs, also see
 	// getConversationListKeyMap, this will still update the model but make it look out of focus
 	focus  bool
-	client *client.Client
-	cb     convosBroadcast
+	convos []*domain.Conversation
+	// rerenderTimer used to rerender conversations, as timestamps gets outdated
+	rerenderTimer timer.Model
+	// resetSelectionTimer helps to move the selection marker back to selected item,
+	// when there is 10 sec of inactivity with conversation list
+	resetSelectionTimer timer.Model
+	client              *client.Client
+	cb                  convosBroadcast
 }
 
 type conversationItem struct{ id, selConvoUsrId, title, status, latestMsg string }
 
-func (i conversationItem) Title() string { return zone.Mark(i.id, fmt.Sprint(i.title, i.status)) }
+func (i conversationItem) Title() string {
+	return zone.Mark(i.id, fmt.Sprint(i.title, i.status))
+}
 func (i conversationItem) FilterValue() string {
 	return zone.Mark(i.id, fmt.Sprintf("%v|%v", i.title, i.selConvoUsrId))
 }
@@ -62,9 +72,11 @@ func InitialConversationModel(c *client.Client) ConversationModel {
 
 	token, ch := c.Conversations.Subscribe()
 	return ConversationModel{
-		conversationList: m,
-		focus:            true,
-		client:           c,
+		conversationList:    m,
+		focus:               true,
+		client:              c,
+		rerenderTimer:       timer.New(10 * time.Second),
+		resetSelectionTimer: timer.New(10 * time.Second),
 		cb: convosBroadcast{
 			ch:    ch,
 			token: token,
@@ -73,7 +85,7 @@ func InitialConversationModel(c *client.Client) ConversationModel {
 }
 
 func (m ConversationModel) Init() tea.Cmd {
-	return m.getConversations()
+	return tea.Batch(m.getConversations(), m.rerenderTimer.Init(), m.resetSelectionTimer.Init())
 }
 
 func (m ConversationModel) Update(msg tea.Msg) (ConversationModel, tea.Cmd) {
@@ -96,10 +108,35 @@ func (m ConversationModel) Update(msg tea.Msg) (ConversationModel, tea.Cmd) {
 		m.conversationList.RemoveItem(0)
 	}
 
+	if m.rerenderTimer.Timedout() {
+		m.rerenderTimer.Timeout = 10 * time.Second
+		m.rerenderTimer.Start()
+		var cmd []tea.Cmd
+		cmd = append(cmd, m.conversationList.SetItems(m.populateConvos()))
+		if m.selDiscUserConvo != nil {
+			cmd = append(cmd, m.conversationList.InsertItem(0, populateConvoItem(0, m.selDiscUserConvo, false)))
+		}
+		return m, tea.Batch(cmd...)
+	}
+
+	if m.resetSelectionTimer.Timedout() {
+		m.resetSelectionTimer.Timeout = 10 * time.Second
+		if m.selConvoItemIdx != m.conversationList.Index() {
+			m.conversationList.Select(m.selConvoItemIdx)
+		}
+		m.resetSelectionTimer.Start()
+	}
+
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
+		m.rerenderTimer.Timeout = 10 * time.Second
 		m.updateConversationWindowSize()
-		return m, nil
+		var cmd []tea.Cmd
+		cmd = append(cmd, m.conversationList.SetItems(m.populateConvos()))
+		if m.selDiscUserConvo != nil {
+			cmd = append(cmd, m.conversationList.InsertItem(0, populateConvoItem(0, m.selDiscUserConvo, false)))
+		}
+		return m, tea.Batch(cmd...)
 
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -107,6 +144,7 @@ func (m ConversationModel) Update(msg tea.Msg) (ConversationModel, tea.Cmd) {
 			if m.focus {
 				selUserID = m.getSelConvoUsrID()
 				selUsername = m.getSelConvoUsername()
+				m.selConvoItemIdx = m.conversationList.Index()
 			}
 			return m, nil
 		case "ctrl+f":
@@ -127,16 +165,22 @@ func (m ConversationModel) Update(msg tea.Msg) (ConversationModel, tea.Cmd) {
 		} else {
 			m.focus = false
 		}
+		actionHappened := false
 		switch msg.Button {
 		case tea.MouseButtonWheelDown:
+			actionHappened = true
 			if zone.Get(conversationContainer).InBounds(msg) {
 				m.conversationList.CursorDown()
 			}
 		case tea.MouseButtonWheelUp:
+			actionHappened = true
+			m.resetSelectionTimer.Timeout = 10 * time.Second
 			if zone.Get(conversationContainer).InBounds(msg) {
 				m.conversationList.CursorUp()
 			}
 		case tea.MouseButtonLeft:
+			actionHappened = true
+			m.resetSelectionTimer.Timeout = 10 * time.Second
 			for i, listItem := range m.conversationList.VisibleItems() {
 				v, _ := listItem.(conversationItem)
 				// Check each item to see if it's in bounds.
@@ -145,6 +189,7 @@ func (m ConversationModel) Update(msg tea.Msg) (ConversationModel, tea.Cmd) {
 					m.conversationList.Select(i)
 					selUserID = m.getSelConvoUsrID()
 					selUsername = m.getSelConvoUsername()
+					m.selConvoItemIdx = i
 					break
 				}
 			}
@@ -156,12 +201,30 @@ func (m ConversationModel) Update(msg tea.Msg) (ConversationModel, tea.Cmd) {
 			}
 		default:
 		}
+		if actionHappened {
+			m.resetSelectionTimer.Timeout = 10 * time.Second
+			return m, m.resetSelectionTimer.Start()
+		}
 
-	case []list.Item:
+	case timer.TickMsg:
+		if msg.ID == m.rerenderTimer.ID() {
+			var cmd tea.Cmd
+			m.rerenderTimer, cmd = m.rerenderTimer.Update(msg)
+			return m, cmd
+		}
+		if msg.ID == m.resetSelectionTimer.ID() {
+			var cmd tea.Cmd
+			m.resetSelectionTimer, cmd = m.resetSelectionTimer.Update(msg)
+			return m, cmd
+		}
+
+	case client.Convos:
+		m.convos = msg
+		m.rerenderTimer.Timeout = 10 * time.Second
 		return m, tea.Batch(
-			m.conversationList.SetItems(msg),
+			m.conversationList.SetItems(m.populateConvos()),
 			spinnerResetCmd,
-			m.getConversations(), //so we can read again for updated conversations
+			m.getConversations(), // to continue the loop
 			m.conversationList.NewStatusMessage("Updated Conversations"),
 		)
 
@@ -187,11 +250,8 @@ func (m ConversationModel) Update(msg tea.Msg) (ConversationModel, tea.Cmd) {
 		m.selDiscUserConvo = convo
 		selUserID = msg.id
 		selUsername = msg.name
-		renderState := false
-		if m.client.WsConnState.Get() == client.Connected {
-			renderState = true
-		}
-		cmd := m.conversationList.InsertItem(0, populateConvoItem(0, convo, renderState))
+		m.selConvoItemIdx = m.conversationList.Index()
+		cmd := m.conversationList.InsertItem(0, populateConvoItem(0, convo, false))
 		return m, cmd
 	}
 
@@ -230,6 +290,9 @@ func getDelegateWithCustomStyling() list.ItemDelegate {
 		BorderForeground(primaryColor).
 		BorderStyle(lipgloss.ThickBorder())
 
+	d.Styles.NormalTitle = d.Styles.NormalTitle.
+		Foreground(whiteColor)
+
 	d.Styles.NormalDesc = d.Styles.NormalDesc.
 		BorderForeground(primaryColor)
 
@@ -244,7 +307,7 @@ func getDelegateWithCustomStyling() list.ItemDelegate {
 
 func applyCustomConversationListStyling(m list.Model) list.Model {
 	m.Styles.StatusBar = m.Styles.StatusBar.
-		Foreground(primaryColor).
+		Foreground(primarySubtleDarkColor).
 		MarginTop(1)
 	m.Styles.NoItems = m.Styles.NoItems.
 		Margin(1, 1).
@@ -271,6 +334,19 @@ func getConversationListKeyMap(enabled bool) list.KeyMap {
 	return km
 }
 
+func (m ConversationModel) populateConvos() []list.Item {
+	c := make([]list.Item, 0)
+	for i, convo := range m.convos {
+		renderState := false
+		if m.client.WsConnState.Get() == client.Connected {
+			renderState = true
+		}
+		item := populateConvoItem(i, convo, renderState)
+		c = append(c, item)
+	}
+	return c
+}
+
 func populateConvoItem(i int, convo *domain.Conversation, renderState bool) conversationItem {
 	id := "item_" + strconv.Itoa(i)
 	var latestMsg string
@@ -283,6 +359,8 @@ func populateConvoItem(i int, convo *domain.Conversation, renderState bool) conv
 	if renderState {
 		s = renderStateInfo(convo)
 	}
+	widthBetweenUsernameAndStatus := conversationWidth() - (lipgloss.Width(convo.Username) + 5)
+	s = lipgloss.NewStyle().Width(widthBetweenUsernameAndStatus).Align(lipgloss.Right).Render(s)
 	item := conversationItem{id, convo.UserID, convo.Username, s, latestMsg}
 	return item
 }
@@ -290,16 +368,11 @@ func populateConvoItem(i int, convo *domain.Conversation, renderState bool) conv
 func renderStateInfo(convo *domain.Conversation) string {
 	t := convo.LastOnline
 	if t == nil {
-		return conversationOnlineIndicator
+		//return conversationOnlineIndicator
+		return "🌟"
 	}
-	// TODO: Show last seen instead
-	return ""
-}
-
-func containsSelConvo(convos []*domain.Conversation, convoUsrID string) bool {
-	return slices.ContainsFunc(convos, func(conversation *domain.Conversation) bool {
-		return convoUsrID == conversation.UserID
-	})
+	onlineAgoTimestamp := calculateOnlineAgoTimestamp(convo.LastOnline)
+	return conversationAgoTimestampStyle.Render(onlineAgoTimestamp)
 }
 
 func (m *ConversationModel) handleConversationListUpdate(msg tea.Msg) tea.Cmd {
@@ -316,24 +389,11 @@ func (m *ConversationModel) updateConversationWindowSize() {
 
 func (m ConversationModel) getConversations() tea.Cmd {
 	return func() tea.Msg {
-		ctx := m.client.BT.GetShtdwnCtx()
-		c := make([]list.Item, 0)
-		convos := <-m.cb.ch
-		// we check if the ctx is done after unblocking
-		select {
-		case <-ctx.Done():
-			return nil
-		default:
-		}
-		for i, convo := range convos {
-			renderState := false
-			if m.client.WsConnState.Get() == client.Connected {
-				renderState = true
+		for {
+			if convos, ok := <-m.cb.ch; ok {
+				return convos
 			}
-			item := populateConvoItem(i, convo, renderState)
-			c = append(c, item)
 		}
-		return c
 	}
 }
 
@@ -357,4 +417,58 @@ func (m ConversationModel) getSelConvoUsername() string {
 	}
 	fv := m.conversationList.SelectedItem().FilterValue()
 	return strings.Split(fv, "|")[0]
+}
+
+func calculateOnlineAgoTimestamp(lastOnline *time.Time) string {
+	if lastOnline == nil {
+		return ""
+	}
+	// parse when duration in sec
+	duration := time.Since(*lastOnline)
+	secs := duration.Seconds()
+	if secs < 60 {
+		return fmt.Sprintf("%vs", int(secs))
+	}
+	// parse when duration in min
+	mins := duration.Minutes()
+	if mins < 60 {
+		sec := math.Mod(mins, 1) * 60
+		intSec := int64(sec)
+		if intSec == 0 {
+			return fmt.Sprintf("%vm", int(mins))
+		}
+		return fmt.Sprintf("%vm%vs", int(mins), intSec)
+	}
+	// parse when duration in hrs
+	hrs := duration.Hours()
+	if hrs < 24 {
+		mins = math.Mod(hrs, 1) * 60
+		intMins := int64(mins)
+		if intMins == 0 {
+			return fmt.Sprintf("%vh", int(hrs))
+		}
+		return fmt.Sprintf("%vh%vm", int(hrs), intMins)
+	}
+	// there is no built-in support for days, months, years etc.
+	// parse when duration in days
+	days := hrs / 24.0
+	if days < 30 {
+		hrs = math.Mod(days, 1) * 24
+		intHrs := int64(hrs)
+		if int(hrs) == 0 {
+			return fmt.Sprintf("%vd", int(days))
+		}
+		return fmt.Sprintf("%vd%vh", int(days), intHrs)
+	}
+	// parse when duration in months
+	mons := days / 30.0 // keeping a month 30 days long for ease of logic
+	if mons < 12 {
+		days = math.Mod(days, 1) * 365
+		intDays := int64(days)
+		if int(intDays) == 0 {
+			return fmt.Sprintf("%vM", int(mons))
+		}
+		return fmt.Sprintf("%vM%vd", int(mons), intDays)
+	}
+	return "💤"
 }

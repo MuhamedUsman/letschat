@@ -43,7 +43,7 @@ func InitialChatModel(c *client.Client) ChatModel {
 }
 
 func (m ChatModel) Init() tea.Cmd {
-	return tea.Batch(textarea.Blink, m.chatViewport.Init(), echoTypingCmd()) // not using timer -> it have bugs
+	return tea.Batch(textarea.Blink, m.chatViewport.Init(), echoTypingCmd()) // not using rerenderTimer -> it have bugs
 }
 
 func (m ChatModel) Update(msg tea.Msg) (ChatModel, tea.Cmd) {

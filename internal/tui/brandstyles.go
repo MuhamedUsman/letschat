@@ -18,8 +18,8 @@ var ( // Global Styling
 	primaryContrastColor   = lipgloss.AdaptiveColor{Light: "#FFC700", Dark: "#4b3b00"}
 	dangerColor            = lipgloss.AdaptiveColor{Light: "#ff7b4e", Dark: "#FF5C00"}
 	dangerDarkColor        = lipgloss.AdaptiveColor{Light: "#b65d3e", Dark: "#a34a00"}
-	whiteColor             = lipgloss.AdaptiveColor{Light: "#202020", Dark: "#FFFCE4"}
-	blackColor             = lipgloss.AdaptiveColor{Light: "#FFFCE4", Dark: "#202020"}
+	whiteColor             = lipgloss.AdaptiveColor{Light: "#202020", Dark: "#E5D6A8"}
+	blackColor             = lipgloss.AdaptiveColor{Light: "#E5D6A8", Dark: "#202020"}
 	darkGreyColor          = lipgloss.AdaptiveColor{Light: "#808080", Dark: "#404040"}
 	lightGreyColor         = lipgloss.AdaptiveColor{Light: "#404040", Dark: "#afafaf"}
 	redColor               = lipgloss.AdaptiveColor{Light: "#FF0000", Dark: "#FF0000"}
@@ -211,7 +211,10 @@ var ( // Conversation Styling
 
 	conversationOnlineIndicator = lipgloss.NewStyle().
 					Foreground(greenColor).
-					Render(" *")
+					Render("⁕")
+
+	conversationAgoTimestampStyle = lipgloss.NewStyle().
+					Foreground(orangeColor)
 )
 
 var (
@@ -315,7 +318,7 @@ var ( // Message Info Styling
 var ( // Preferences Styles
 
 	updateProfileWidth = func() int { return tabGapLeftWidth + 14 }
-	usageWidth         = func() int { return tabGapRightWithTabsWidth - 10 }
+	usageWidth         = func() int { return tabGapRightWithTabsWidth - 18 }
 
 	verticalDivider = lipgloss.NewStyle().
 			BorderStyle(lipgloss.NormalBorder()).
