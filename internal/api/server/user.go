@@ -1,10 +1,12 @@
 package server
 
 import (
+	"context"
 	"errors"
 	"github.com/M0hammadUsman/letschat/internal/api/utility"
 	"github.com/M0hammadUsman/letschat/internal/domain"
 	"net/http"
+	"time"
 )
 
 func (s *Server) RegisterUserHandler(w http.ResponseWriter, r *http.Request) {
@@ -62,8 +64,10 @@ func (s *Server) UpdateUserHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	// TODO: once everything is done, send the updated user's conversations a msg to re-fetch conversations
-
+	// tell every user related to this updated user to sync their conversations
+	if err := s.broadcastUserAccountUpdate(r.Context()); err != nil {
+		s.serverErrorResponse(w, r, err)
+	}
 }
 
 func (s *Server) ActivateUserHandler(w http.ResponseWriter, r *http.Request) {
@@ -119,4 +123,31 @@ func (s *Server) GetCurrentActiveUserHandler(w http.ResponseWriter, r *http.Requ
 	if err := s.writeJSON(w, envelop{"user": u}, http.StatusOK, nil); err != nil {
 		s.serverErrorResponse(w, r, err)
 	}
+}
+
+// Once the receivers gets this broadcast, ideally they will re-fetch the conversations, for synchronization
+func (s *Server) broadcastUserAccountUpdate(ctx context.Context) error {
+	convos, err := s.Facade.GetConversations(ctx)
+	if err != nil {
+		return err
+	}
+	u := utility.ContextGetUser(ctx)
+	if u == nil {
+		panic("no user was found in the context, Hint: missing Authentication middleware")
+	}
+	for _, convo := range convos {
+		if convo.LastOnline != nil { // meaning the user is not online
+			continue
+		}
+		t := time.Now()
+		msg := domain.Message{
+			SenderID:  u.ID,
+			SentAt:    &t,
+			Operation: domain.SyncConvosMsg,
+		}
+		if v, ok := s.Subscribers[convo.UserID]; ok {
+			v.Messages <- &msg
+		}
+	}
+	return nil
 }

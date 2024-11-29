@@ -288,6 +288,7 @@ func (m ChatViewportModel) Update(msg tea.Msg) (ChatViewportModel, tea.Cmd) {
 
 		case domain.TypingMsg:
 			selUserTyping = true
+
 		default:
 		}
 

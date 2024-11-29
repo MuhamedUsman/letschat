@@ -43,8 +43,10 @@ type ConversationModel struct {
 	// resetSelectionTimer helps to move the selection marker back to selected item,
 	// when there is 10 sec of inactivity with conversation list
 	resetSelectionTimer timer.Model
-	client              *client.Client
-	cb                  convosBroadcast
+	// used to get the selected convo to the top, once a msg is sent
+	msgSent bool
+	client  *client.Client
+	cb      convosBroadcast
 }
 
 type conversationItem struct{ id, selConvoUsrId, title, status, latestMsg string }
@@ -106,6 +108,11 @@ func (m ConversationModel) Update(msg tea.Msg) (ConversationModel, tea.Cmd) {
 	if m.selDiscUserConvo != nil && m.selDiscUserConvo.UserID != selUserID {
 		m.selDiscUserConvo = nil
 		m.conversationList.RemoveItem(0)
+	}
+
+	// if the selUser has updated his/her username we need to update, this logic keep it in sync
+	if m.getSelConvoUsrID() == selUserID {
+		selUsername = m.getSelConvoUsername()
 	}
 
 	if m.rerenderTimer.Timedout() {
@@ -220,6 +227,13 @@ func (m ConversationModel) Update(msg tea.Msg) (ConversationModel, tea.Cmd) {
 
 	case client.Convos:
 		m.convos = msg
+		// e.g. if the conversation selected is not at the top, it will get to the top because of recent msg sent
+		// so we also need to change the selection marker accordingly
+		if validMsgForSend {
+			m.conversationList.ResetSelected()
+			m.selConvoItemIdx = 0
+			validMsgForSend = false
+		}
 		m.rerenderTimer.Timeout = 10 * time.Second
 		return m, tea.Batch(
 			m.conversationList.SetItems(m.populateConvos()),
@@ -253,6 +267,7 @@ func (m ConversationModel) Update(msg tea.Msg) (ConversationModel, tea.Cmd) {
 		m.selConvoItemIdx = m.conversationList.Index()
 		cmd := m.conversationList.InsertItem(0, populateConvoItem(0, convo, false))
 		return m, cmd
+
 	}
 
 	return m, tea.Batch(m.handleConversationListUpdate(msg))
@@ -459,16 +474,6 @@ func calculateOnlineAgoTimestamp(lastOnline *time.Time) string {
 			return fmt.Sprintf("%vd", int(days))
 		}
 		return fmt.Sprintf("%vd%vh", int(days), intHrs)
-	}
-	// parse when duration in months
-	mons := days / 30.0 // keeping a month 30 days long for ease of logic
-	if mons < 12 {
-		days = math.Mod(days, 1) * 365
-		intDays := int64(days)
-		if int(intDays) == 0 {
-			return fmt.Sprintf("%vM", int(mons))
-		}
-		return fmt.Sprintf("%vM%vd", int(mons), intDays)
 	}
 	return "💤"
 }

@@ -269,6 +269,7 @@ var (
 	chatBubbleLStyle = lipgloss.NewStyle().
 				Border(chatBubbleLBorder, true).
 				BorderForeground(whiteColor).
+				Foreground(whiteColor).
 				Padding(0, 1)
 
 	chatBubbleRStyle = lipgloss.NewStyle().

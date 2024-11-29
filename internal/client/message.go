@@ -181,6 +181,18 @@ func (c *Client) handleReceivedMsgs(shtdwnCtx context.Context) {
 			case domain.OfflineMsg:
 				c.setUsrOnlineStatus(msg, false)
 
+			case domain.SyncConvosMsg:
+				convos, code, err := c.getConversations()
+				if err != nil {
+					err = fmt.Errorf("fetching conversation after receiving SyncConvosMsg, err=\"%v\"", err)
+					slog.Error(err.Error())
+				}
+				if code == http.StatusUnauthorized {
+					c.LoginState.Write(false) // user will be redirected to log-in by tui
+				}
+				if code == http.StatusOK && err == nil {
+					c.saveConvosAndWriteToChan(convos)
+				}
 			}
 
 		case <-shtdwnCtx.Done():
