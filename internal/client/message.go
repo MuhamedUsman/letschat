@@ -61,6 +61,8 @@ func (c *Client) SendMessage(msg domain.Message) error {
 		convos, code, err = c.getConversations()
 		if err != nil {
 			err = fmt.Errorf("fetching conversation after saving sent msg, err=\"%v\"", err)
+			slog.Error(err.Error())
+			return err
 		}
 		if code == http.StatusUnauthorized {
 			c.LoginState.Write(false) // user will be redirected to log-in by tui

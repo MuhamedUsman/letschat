@@ -66,11 +66,6 @@ func (s *Server) inactiveAccountResponse(w http.ResponseWriter, r *http.Request)
 	s.errorResponse(w, r, http.StatusForbidden, message)
 }
 
-func (s *Server) noSubscriptionResponse(w http.ResponseWriter, r *http.Request) {
-	message := "no subscription found for response writing"
-	s.errorResponse(w, r, http.StatusFailedDependency, message)
-}
-
 func (s *Server) redundantSubscription(w http.ResponseWriter, r *http.Request) {
 	message := "single instance of subscription is allowed for this account"
 	s.errorResponse(w, r, http.StatusConflict, message)

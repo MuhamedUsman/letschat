@@ -30,7 +30,6 @@ type ChatModel struct {
 	// menu buttons, -1 -> None Selected | 0 -> Goto First Msg | 1 -> Clear Conversation
 	menuBtnIdx int
 	client     *client.Client
-	cb         convosBroadcast
 }
 
 func InitialChatModel(c *client.Client) ChatModel {

@@ -26,13 +26,12 @@ type UpdateProfileModel struct {
 	errFieldTitles   []string
 	inputFieldStyles []inputStyles
 	txtInputs        []textinput.Model
-	placeholders     []string
 	tabIdx           int
 	spinner          spinner.Model
 	ev               *domain.ErrValidation
 	client           *client.Client
 	// booleans for state management
-	spin, dangerState, includePass, showSuccess, populatePlaceholders, focus bool
+	spin, includePass, showSuccess, populatePlaceholders, focus bool
 	// to detect changes to currentUser name & email
 	prevName, prevEmail string
 }

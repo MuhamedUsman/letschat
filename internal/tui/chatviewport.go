@@ -44,12 +44,11 @@ type ChatViewportModel struct {
 	selMsgId *string
 	// current button selection once the msg info dialog in focus,
 	// 0 -> CopyBtn | 1 -> DeleteForMeBtn | 2 -> DeleteForEveryoneBtn
-	selMsgDialogBtn           int  // -1 when the selMsgId is nil
-	gotoFirstMsg              bool // once at first msg, set to false
-	focus                     bool
-	fetching                  bool
-	recvTypingTimer           timer.Model
-	lastTypingStateReceivedAt time.Time
+	selMsgDialogBtn int  // -1 when the selMsgId is nil
+	gotoFirstMsg    bool // once at first msg, set to false
+	focus           bool
+	fetching        bool
+	recvTypingTimer timer.Model
 	// only used when msgPage is received
 	prevLineCount int
 	client        *client.Client

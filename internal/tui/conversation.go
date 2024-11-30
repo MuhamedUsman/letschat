@@ -43,10 +43,8 @@ type ConversationModel struct {
 	// resetSelectionTimer helps to move the selection marker back to selected item,
 	// when there is 10 sec of inactivity with conversation list
 	resetSelectionTimer timer.Model
-	// used to get the selected convo to the top, once a msg is sent
-	msgSent bool
-	client  *client.Client
-	cb      convosBroadcast
+	client              *client.Client
+	cb                  convosBroadcast
 }
 
 type conversationItem struct{ id, selConvoUsrId, title, status, latestMsg string }
@@ -383,8 +381,7 @@ func populateConvoItem(i int, convo *domain.Conversation, renderState bool) conv
 func renderStateInfo(convo *domain.Conversation) string {
 	t := convo.LastOnline
 	if t == nil {
-		//return conversationOnlineIndicator
-		return "🌟"
+		return conversationOnlineIndicator
 	}
 	onlineAgoTimestamp := calculateOnlineAgoTimestamp(convo.LastOnline)
 	return conversationAgoTimestampStyle.Render(onlineAgoTimestamp)

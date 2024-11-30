@@ -211,7 +211,7 @@ var ( // Conversation Styling
 
 	conversationOnlineIndicator = lipgloss.NewStyle().
 					Foreground(greenColor).
-					Render("⁕")
+					Render("🌟")
 
 	conversationAgoTimestampStyle = lipgloss.NewStyle().
 					Foreground(orangeColor)
@@ -412,8 +412,6 @@ var ( // Bunny Stying
 )
 
 var (
-	rabbitColor = bunnyColor
-
 	rabbit = lipgloss.NewStyle().
 		Foreground(primaryColor).
 		MarginTop(1).
