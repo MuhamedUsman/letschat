@@ -1,5 +1,5 @@
 FROM golang:1.23.3-alpine3.20 AS builder
-LABEL authors="usman"
+LABEL authors="usman243"
 WORKDIR /home/usr/app
 RUN apk --no-cache add make
 COPY go.mod go.sum ./
@@ -7,7 +7,7 @@ RUN go mod download
 COPY . ./
 RUN make build/docker
 
-FROM alpine:3.20
+FROM scratch as final
 ENV HOME=/home/usr/app/bin
 WORKDIR $HOME
 COPY --from=builder $HOME/letschat-api $HOME

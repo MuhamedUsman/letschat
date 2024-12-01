@@ -1,36 +1,21 @@
-name: Greenlight_CICD_Pipeline
+name: Letschat_API_CICD_Pipeline
 
 on: [push, pull_request]
 
 jobs:
   build:
-    runs-on: self-hosted
-
+    runs-on: ubuntu-latest
     steps:
-      - name: Cleanup workspace
-        run: sudo rm -rf ${{ github.workspace }}/*
+      - uses: actions/checkout@v3
+        name: Check out code
 
-      - uses: actions/checkout@v4
-
-      - name: Remove old env files
-        run: rm -f .env .envrc || true
-
-      - name: Create .env & .envrc file
-        run: |
-          echo "${{ secrets.ENV }}" >> .env
-          echo "${{ secrets.ENVRC }}" >> .envrc
-
-      - name: Rebuild & Restart using docker compose
-        run: |
-          if ! sudo docker-compose up -d --build; then
-            echo "Docker Compose failed"
-            exit 1
-          fi
-
-      - name: Notify on success
-        if: success()
-        run: echo "Deployment successful!"
-
-      - name: Notify on failure
-        if: failure()
-        run: echo "Deployment failed!"
+      - uses: mr-smithers-excellent/docker-build-push@v6.4
+        name: Docker Build & Push Docker Image
+        with:
+          image: personal/letschat-api
+          tags: v1
+          registry: docker.io
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+          addLatest: true
+          addTimestamp: true
