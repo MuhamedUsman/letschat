@@ -27,5 +27,5 @@ go.work.sum
 
 # project files
 .idea/
-compose-dev.yml
+compose.yml
 *.log

@@ -10,4 +10,4 @@ CREATE TABLE IF NOT EXISTS message (
     version INT NOT NULL DEFAULT 1
 );
 
-CREATE INDEX idx_message_sender_receiver_sent_at ON message(sender_id, receiver_id, timestamp DESC);
+CREATE INDEX idx_message_sender_receiver_sent_at ON message(sender_id, receiver_id, sent_at DESC);

@@ -25,7 +25,7 @@ db/migration/new:
 .PHONY: db/migration/apply
 db/migration/apply:
 	@read -p "Input apply params: " apply_params; \
-	migrate -path ./migrations -database ${LETSCHAT_DB_DSN} $$apply_params
+	migrate -path ./migrations -database ${LETSCHAT_API_DB_DSN} $$apply_params
 
 ## compose/run: run docker compose with your specified command & flags
 .PHONY: compose/run
