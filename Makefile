@@ -70,4 +70,4 @@ build/letschat-api:
 
 .PHONY: build/docker
 build/docker:
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags=${linker_flags} -o ./bin/letschat-api ./cmd/letschat-api
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags='-s -w' -o ./bin/letschat-api ./cmd/letschat-api
