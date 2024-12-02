@@ -12,8 +12,7 @@ RUN apk --no-cache add ca-certificates
 ENV HOME=/home/usr/app/bin
 WORKDIR $HOME
 RUN addgroup -S letschatGroup && adduser -S letschat -G letschatGroup
-COPY --from=builder /home/usr/app/bin/letschat-api ./letschat-api
+COPY --from=builder $HOME/letschat-api ./letschat-api
 RUN chown letschat:letschatGroup letschat-api
 USER letschat:letschatGroup
 ENTRYPOINT ["./letschat-api"]
-CMD ["-db-dsn=${LETSCHAT_API_DB_DSN}"]
