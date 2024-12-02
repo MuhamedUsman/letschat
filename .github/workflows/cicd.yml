@@ -12,7 +12,7 @@ jobs:
       - uses: mr-smithers-excellent/docker-build-push@v6.4
         name: Docker Build & Push Docker Image
         with:
-          image: personal/letschat-api
+          image: usman243/letschat-api
           registry: docker.io
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_TOKEN }}
