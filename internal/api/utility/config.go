@@ -41,9 +41,9 @@ func ParseFlags() *Config {
 	// SMTP Flags
 	flag.StringVar(&cfg.SMTP.Host, "smtp-host", "sandbox.smtp.mailtrap.io", "SMTP server host")
 	flag.IntVar(&cfg.SMTP.Port, "smtp-port", 587, "SMTP server port")
-	flag.StringVar(&cfg.SMTP.Username, "smtp-username", "d74896c632ff65", "SMTP username")
-	flag.StringVar(&cfg.SMTP.Password, "smtp-password", "d79a98c2ff9076", "SMTP password")
-	flag.StringVar(&cfg.SMTP.Sender, "smtp-sender", "Letschat <no-reply.letschat@muhammadusman.site>", "SMTP sender")
+	flag.StringVar(&cfg.SMTP.Username, "smtp-username", "", "SMTP username")
+	flag.StringVar(&cfg.SMTP.Password, "smtp-password", "", "SMTP password")
+	flag.StringVar(&cfg.SMTP.Sender, "smtp-sender", "", "SMTP sender")
 	flag.Parse()
 	return &cfg
 }
