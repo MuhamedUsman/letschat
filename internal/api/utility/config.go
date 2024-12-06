@@ -39,7 +39,7 @@ func ParseFlags() *Config {
 	flag.IntVar(&cfg.DB.MaxIdleConn, "db-max-idle-conn", 25, "PostgreSQL max idle connections")
 	flag.StringVar(&cfg.DB.MaxIdleConnTime, "db-max-idle-time", "15m", "PostgreSQL max idle connection time")
 	// SMTP Flags
-	flag.StringVar(&cfg.SMTP.Host, "smtp-host", "sandbox.smtp.mailtrap.io", "SMTP server host")
+	flag.StringVar(&cfg.SMTP.Host, "smtp-host", "", "SMTP server host")
 	flag.IntVar(&cfg.SMTP.Port, "smtp-port", 587, "SMTP server port")
 	flag.StringVar(&cfg.SMTP.Username, "smtp-username", "", "SMTP username")
 	flag.StringVar(&cfg.SMTP.Password, "smtp-password", "", "SMTP password")

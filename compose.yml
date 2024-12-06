@@ -24,7 +24,7 @@ services:
     volumes:
       - ./migrations:/migrations
     command:
-      ["-path", "/migrations", "-database", "${LETSCHAT_API_DB_DSN}", "up"]
+      ["-path", "/migrations", "-database=${LETSCHAT_API_DB_DSN}", "up"]
     depends_on:
       - db
     networks:
