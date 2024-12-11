@@ -1,7 +1,8 @@
 package client
 
 const (
-	baseUrl               = "https://muhammadusman.site/v1"
+	//baseUrl               = "https://muhammadusman.site/v1"
+	baseUrl               = "http://localhost:8080/v1"
 	usersEndpoint         = "/users"
 	tokensEndpoint        = "/tokens"
 	conversationsEndpoint = "/conversations"

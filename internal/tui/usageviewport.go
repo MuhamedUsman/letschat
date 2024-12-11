@@ -5,6 +5,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glamour"
+	"github.com/charmbracelet/lipgloss"
 )
 
 type UsageViewportModel struct {
@@ -14,12 +15,10 @@ type UsageViewportModel struct {
 }
 
 func NewUsageViewportModel() UsageViewportModel {
+	vp := viewport.New(0, 0)
 	usageFiles := embed.EmbeddedFilesInstance()
 	g, _ := glamour.NewTermRenderer(glamour.WithStylesFromJSONBytes(usageFiles.UsageTheme), glamour.WithEmoji())
 	usage, _ := g.Render(string(usageFiles.UsageFile))
-	vp := viewport.New(0, 0)
-	vp.SetContent(usage)
-
 	return UsageViewportModel{
 		vp:    vp,
 		usage: usage,
@@ -41,7 +40,7 @@ func (m UsageViewportModel) Update(msg tea.Msg) (UsageViewportModel, tea.Cmd) {
 	if _, ok := msg.(tea.WindowSizeMsg); ok {
 		m.vp.Width = usageWidth()
 		m.vp.Height = conversationHeight() - 1
-		m.vp.SetContent(m.usage)
+		m.vp.SetContent(m.renderViewport())
 	}
 	var cmd tea.Cmd
 	m.vp, cmd = m.vp.Update(msg)
@@ -50,4 +49,10 @@ func (m UsageViewportModel) Update(msg tea.Msg) (UsageViewportModel, tea.Cmd) {
 
 func (m UsageViewportModel) View() string {
 	return m.vp.View()
+}
+
+func (m UsageViewportModel) renderViewport() string {
+	title := sectionTitleStyle.Render("Letschat Usage")
+	title = lipgloss.PlaceHorizontal(usageWidth(), lipgloss.Center, title)
+	return lipgloss.JoinVertical(lipgloss.Left, title, m.usage)
 }

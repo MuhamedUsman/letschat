@@ -277,7 +277,9 @@ func (c *Client) manageUserLogins(shtdwnCtx context.Context) {
 		if retrievedUsr != nil && retrievedUsr.ID != u.ID {
 			// ignore the error as it will be related to path meaning it can't be able to find the file
 			// in this case we'll still be creating a new DB file
-			_ = repository.DeleteDBFile(c.FilesDir)
+			if err := repository.DeleteDBFile(c.FilesDir); err != nil {
+				slog.Error(err.Error())
+			}
 			// Opening a new conn to sqlite db will create a new file
 			db, err := repository.OpenDB(c.FilesDir, c.krm.key)
 			// very unlikely but if happens, there is no reason to continue normal application execution
