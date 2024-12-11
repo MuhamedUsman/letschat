@@ -3,11 +3,6 @@ name: Greenlight_CICD_Pipeline
 on:
   push:
     branches: [ main ]
-    paths:
-      - 'cmd/**'
-      - 'internal/**'
-      - 'go.mod'
-      - 'go.sum'
     paths-ignore:
       - 'cmd/letschat/**'
       - 'internal/client/**'
@@ -15,11 +10,6 @@ on:
 
   pull_request:
     branches: [ main ]
-    paths:
-      - 'cmd/**'
-      - 'internal/**'
-      - 'go.mod'
-      - 'go.sum'
     paths-ignore:
       - 'cmd/letschat/**'
       - 'internal/client/**'
