@@ -1,4 +1,4 @@
-name: Greenlight_CICD_Pipeline
+name: Letschat_CICD_Pipeline
 
 on:
   push:
