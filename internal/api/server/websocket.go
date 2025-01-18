@@ -143,7 +143,7 @@ func (s *Server) handleSentMessages(shutdownCtx, reqCtx context.Context, conn *w
 			return err
 		}
 		// ProcessSentMessage populate the domain.Message and also concurrently persist it to DB with 5 retries
-		msg, err := s.Facade.ProcessSentMessage(reqCtx, ms, u)
+		msg, convoCreated, err := s.Facade.ProcessSentMessage(reqCtx, ms, u)
 		if err != nil {
 			if errors.Is(err, domain.ErrValidation{}) {
 				handleValidationError(conn, err)
@@ -161,6 +161,12 @@ func (s *Server) handleSentMessages(shutdownCtx, reqCtx context.Context, conn *w
 			}
 			select {
 			case relayTo.Messages <- msg:
+				if convoCreated {
+					if err = s.syncConvos(reqCtx); err != nil {
+						slog.Error(err.Error())
+						return err
+					}
+				}
 			case <-shutdownCtx.Done():
 				return nil
 			case <-reqCtx.Done():

@@ -39,8 +39,6 @@ func (*MessageService) PopulateMessage(m domain.MessageSent, sndr *domain.User) 
 }
 
 func (s *MessageService) ProcessSentMessages(ctx context.Context, m *domain.Message) error {
-	// the Primary key constraint ensures, at any instant there only exists 1 msg for a specific msgId, so delete that
-	// msg without specifying the operation
 	switch m.Operation {
 
 	case domain.CreateMsg:

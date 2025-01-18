@@ -27,24 +27,26 @@ func NewMessageFacade(service *service.Service,
 func (f *MessageFacade) ProcessSentMessage(ctx context.Context,
 	m domain.MessageSent,
 	u *domain.User,
-) (*domain.Message, error) {
+) (*domain.Message, bool, error) {
 	if ev := m.ValidateMessageSent(); ev != nil && ev.HasErrors() {
-		return nil, ev
+		return nil, false, ev
 	}
 	msg := f.service.PopulateMessage(m, u)
+	convoCreated := false
 	if msg.Operation == domain.CreateMsg {
 		convoExists, err := f.service.ConversationExists(ctx, msg.SenderID, m.ReceiverID)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		if !convoExists {
-			if err = f.service.CreateConversation(ctx, msg.SenderID, m.ReceiverID); err != nil {
-				return nil, err
+			convoCreated, err = f.service.CreateConversation(ctx, msg.SenderID, m.ReceiverID)
+			if err != nil {
+				return nil, convoCreated, err
 			}
 		}
 	}
 	f.processMessage(ctx, msg)
-	return msg, nil
+	return msg, convoCreated, nil
 }
 
 func (f *MessageFacade) WriteUnDeliveredMessagesToWSConn(ctx context.Context, c domain.MsgChan) error {

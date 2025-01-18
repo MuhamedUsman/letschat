@@ -16,7 +16,7 @@ func NewConversationService(cr domain.ConversationRepository) *ConversationServi
 	return &ConversationService{conversationRepository: cr}
 }
 
-func (s *ConversationService) CreateConversation(ctx context.Context, senderID, receiverID string) error {
+func (s *ConversationService) CreateConversation(ctx context.Context, senderID, receiverID string) (bool, error) {
 	return s.conversationRepository.CreateConversation(ctx, senderID, receiverID)
 }
 

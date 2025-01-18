@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"database/sql"
 	"github.com/M0hammadUsman/letschat/internal/domain"
 	"github.com/jmoiron/sqlx"
 )
@@ -16,18 +17,23 @@ func NewConversationRepository(db *DB) *ConversationRepository {
 	return &ConversationRepository{DB: db}
 }
 
-func (r *ConversationRepository) CreateConversation(ctx context.Context, senderID, receiverID string) error {
+func (r *ConversationRepository) CreateConversation(ctx context.Context, senderID, receiverID string) (bool, error) {
 	query := `
 		INSERT INTO conversation 
 		VALUES ($1, $2)
 		`
 	var err error
+	var res sql.Result
 	if tx := contextGetTX(ctx); tx != nil {
-		_, err = tx.Exec(query, senderID, receiverID)
+		res, err = tx.Exec(query, senderID, receiverID)
 	} else {
-		_, err = r.DB.ExecContext(ctx, query, senderID, receiverID)
+		res, err = r.DB.ExecContext(ctx, query, senderID, receiverID)
 	}
-	return err
+	if err != nil {
+		return false, err
+	}
+	count, err := res.RowsAffected()
+	return count > 0, err
 }
 
 func (r *ConversationRepository) GetConversations(ctx context.Context, usrID string) ([]*domain.Conversation, error) {

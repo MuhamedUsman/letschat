@@ -20,13 +20,13 @@ type Conversation struct {
 }
 
 type ConversationService interface {
-	CreateConversation(ctx context.Context, senderID, receiverID string) error
+	CreateConversation(ctx context.Context, senderID, receiverID string) (bool, error)
 	GetConversations(ctx context.Context) ([]*Conversation, error)
 	ConversationExists(ctx context.Context, senderID, receiverID string) (bool, error)
 }
 
 type ConversationRepository interface {
-	CreateConversation(ctx context.Context, senderID, receiverID string) error
+	CreateConversation(ctx context.Context, senderID, receiverID string) (bool, error)
 	GetConversations(ctx context.Context, usrID string) ([]*Conversation, error)
 	ConversationExists(ctx context.Context, senderID, receiverID string) (bool, error)
 }
