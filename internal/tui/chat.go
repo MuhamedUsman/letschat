@@ -211,8 +211,10 @@ func newChatTxtArea() textarea.Model {
 	ta.CharLimit = 1000
 	ta.ShowLineNumbers = false
 	ta.SetHeight(0)
+	ta.FocusedStyle.CursorLine = lipgloss.NewStyle()
 	ta.Cursor.Style = lipgloss.NewStyle().Foreground(primaryColor)
-	ta.FocusedStyle.CursorLine = lipgloss.NewStyle().Foreground(whiteColor)
+	ta.FocusedStyle.Base = lipgloss.NewStyle().Foreground(whiteColor)
+	ta.BlurredStyle.Base = lipgloss.NewStyle().Foreground(whiteColor)
 	return ta
 }
 

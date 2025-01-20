@@ -9,7 +9,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	zone "github.com/lrstanley/bubblezone"
-	"log/slog"
 	"net/http"
 	"strconv"
 	"unicode/utf8"
@@ -77,17 +76,12 @@ func (m DiscoverModel) Update(msg tea.Msg) (DiscoverModel, tea.Cmd) {
 			}
 			if m.focusIdx == 1 && m.focus {
 				selRow := m.table.SelectedRow()
-				idx, err := strconv.Atoi(selRow[0]) // visual index (#)
-				if err != nil {
-					slog.Error(err.Error())
-				} else {
-					selMsg := selDiscUserMsg{
-						id:    m.tableUsrIDs[idx-1],
-						name:  selRow[1],
-						email: selRow[2],
-					}
-					return m, func() tea.Msg { return selMsg } // cmd
+				selMsg := selDiscUserMsg{
+					id:    m.tableUsrIDs[0],
+					name:  selRow[1],
+					email: selRow[2],
 				}
+				return m, func() tea.Msg { return selMsg } // cmd
 			}
 		}
 

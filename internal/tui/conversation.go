@@ -12,6 +12,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	zone "github.com/lrstanley/bubblezone"
 	"math"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -152,8 +153,8 @@ func (m ConversationModel) Update(msg tea.Msg) (ConversationModel, tea.Cmd) {
 				m.selConvoItemIdx = m.conversationList.Index()
 			}
 			return m, nil
-		case "ctrl+f":
-			return m, tea.Batch(m.conversationList.FilterInput.Focus(), m.handleConversationListUpdate(msg))
+		/*case "ctrl+f":
+		return m, tea.Batch(m.conversationList.FilterInput.Focus(), m.handleConversationListUpdate(msg))*/
 		case "ctrl+t":
 			m.conversationList.FilterInput.Blur()
 		case "ctrl+s":
@@ -233,8 +234,17 @@ func (m ConversationModel) Update(msg tea.Msg) (ConversationModel, tea.Cmd) {
 			validMsgForSend = false
 		}
 		m.rerenderTimer.Timeout = 10 * time.Second
+		var cmds = make([]tea.Cmd, 2)
+		cmds[0] = m.conversationList.SetItems(m.populateConvos())
+		// remove the selection if exists in the conversation list already
+		if m.convoExists() {
+			m.selDiscUserConvo = nil
+		}
+		if m.selDiscUserConvo != nil { // if the conversation list refreshes when there is temporary discover user selected
+			cmds[1] = m.conversationList.InsertItem(0, populateConvoItem(0, m.selDiscUserConvo, false))
+		}
 		return m, tea.Batch(
-			m.conversationList.SetItems(m.populateConvos()),
+			tea.Sequence(cmds...),
 			spinnerResetCmd,
 			m.getConversations(), // to continue the loop
 			m.conversationList.NewStatusMessage("Updated Conversations"),
@@ -336,6 +346,7 @@ func getConversationListKeyMap(enabled bool) list.KeyMap {
 	km.Quit = kb           // default
 	km.ForceQuit = kb      // default
 	if !enabled {
+		km.Filter = kb
 		km.CursorUp = kb
 		km.CursorDown = kb
 		km.NextPage = kb
@@ -410,7 +421,7 @@ func (m ConversationModel) getConversations() tea.Cmd {
 }
 
 func (m ConversationModel) getSelConvoUsrID() string {
-	// We hold the actual "title|selectedConvoUsrID" in the filter value
+	// We hold "title|selectedConvoUsrID" in the filter value
 	if m.conversationList.SelectedItem() == nil {
 		return ""
 	}
@@ -429,6 +440,15 @@ func (m ConversationModel) getSelConvoUsername() string {
 	}
 	fv := m.conversationList.SelectedItem().FilterValue()
 	return strings.Split(fv, "|")[0]
+}
+
+func (m ConversationModel) convoExists() bool {
+	return slices.ContainsFunc(m.convos, func(convo *domain.Conversation) bool {
+		if m.selDiscUserConvo != nil && convo.UserID == m.selDiscUserConvo.UserID {
+			return true
+		}
+		return false
+	})
 }
 
 func calculateOnlineAgoTimestamp(lastOnline *time.Time) string {

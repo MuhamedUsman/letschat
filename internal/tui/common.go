@@ -63,3 +63,5 @@ func countdownShowSuccessCmd() tea.Cmd {
 		return hideSuccessMsg{}
 	}
 }
+
+type resetSelConvoUsr bool
