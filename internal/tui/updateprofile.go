@@ -102,13 +102,13 @@ func (m UpdateProfileModel) Update(msg tea.Msg) (UpdateProfileModel, tea.Cmd) {
 				if !m.includePass && m.tabIdx == 1 {
 					m.tabIdx = 4
 				}
-				m.tabIdx = (m.tabIdx + 1) % (len(m.inputTitles) + 2)
+				m.tabIdx = (m.tabIdx + 1) % (len(m.inputTitles) + 3)
 				m.focusTxtInputsAccordingly()
 			}
 
 		case "shift+tab":
 			if m.focus {
-				l := len(m.inputTitles) + 2
+				l := len(m.inputTitles) + 3
 				m.tabIdx = (m.tabIdx - 1 + l) % l
 				if !m.includePass && m.tabIdx == 4 {
 					m.tabIdx = 1
@@ -146,6 +146,8 @@ func (m UpdateProfileModel) Update(msg tea.Msg) (UpdateProfileModel, tea.Cmd) {
 						return m, tea.Batch(m.spinner.Tick, m.updateUser())
 					}
 				}
+			case 7:
+				return m, m.logout()
 			}
 
 		case "up", "left":
@@ -161,7 +163,7 @@ func (m UpdateProfileModel) Update(msg tea.Msg) (UpdateProfileModel, tea.Cmd) {
 
 	case tea.MouseMsg:
 		if msg.Button == tea.MouseButtonLeft {
-			for i := range 7 {
+			for i := range 8 {
 				if zone.Get(fmt.Sprint("formItem", i)).InBounds(msg) {
 					m.tabIdx = i
 					m.focusTxtInputsAccordingly()
@@ -256,7 +258,20 @@ func (m UpdateProfileModel) renderForm() string {
 	if m.showSuccess {
 		successMsg := updateProfileFormSuccessStyle.Width(updateProfileWidth() - 10).Render()
 		sb.WriteString(lipgloss.PlaceHorizontal(updateProfileWidth()-6, lipgloss.Center, successMsg))
+		return sb.String()
 	}
+	logoutActionStyle := lipgloss.NewStyle().Foreground(dangerDarkColor)
+	if m.tabIdx == 7 {
+		logoutActionStyle = lipgloss.NewStyle().
+			Foreground(dangerColor).
+			Italic(true).
+			Underline(true)
+	}
+
+	logoutPrompt := zone.Mark("formItem7", logoutActionStyle.Render("Logout!"))
+	logoutPrompt = logoutPromptStyle.Render(logoutPrompt)
+	logoutPrompt = lipgloss.PlaceHorizontal(updateProfileWidth()-6, lipgloss.Center, logoutPrompt)
+	sb.WriteString(logoutPrompt)
 	return sb.String()
 }
 
@@ -490,5 +505,14 @@ func (m *UpdateProfileModel) updateUser() tea.Cmd {
 			}
 		}
 		return doneMsg{}
+	}
+}
+
+func (m UpdateProfileModel) logout() tea.Cmd {
+	return func() tea.Msg {
+		if err := m.client.Logout(); err != nil {
+			return errMsg{err: err.Error()}
+		}
+		return nil
 	}
 }

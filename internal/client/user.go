@@ -275,8 +275,7 @@ func (c *Client) manageUserLogins(shtdwnCtx context.Context) {
 		retrievedUsr, _ := c.repo.GetCurrentUser() // ignore the error
 		// delete the previous db
 		if retrievedUsr != nil && retrievedUsr.ID != u.ID {
-			// ignore the error as it will be related to path meaning it can't be able to find the file
-			// in this case we'll still be creating a new DB file
+			// ignore the error, missing file path, already deleted
 			if err := repository.DeleteDBFile(c.FilesDir); err != nil {
 				slog.Error(err.Error())
 			}
@@ -299,4 +298,13 @@ func (c *Client) manageUserLogins(shtdwnCtx context.Context) {
 			slog.Error("unable to save current user to local repo", "err", err.Error())
 		}
 	}
+}
+
+func (c *Client) Logout() error {
+	if err := c.krm.removeAuthTokenFromKeyring(); err != nil {
+		slog.Error(err.Error())
+		return err
+	}
+	c.LoginState.Write(false)
+	return nil
 }

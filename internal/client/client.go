@@ -59,7 +59,7 @@ func Init(key int) error {
 	var err error
 	once.Do(func() {
 		c.FilesDir, err = getAppStoragePath(appName)
-		c.krm, err = newKeyringManager(key) // TODO: remove key
+		c.krm, err = newKeyringManager(key)
 		if err != nil {
 			return
 		}

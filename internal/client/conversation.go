@@ -128,5 +128,5 @@ func (c *Client) saveConvosAndWriteToChan(convos []*domain.Conversation) {
 	c.populateConvosWithLatestMsgs(convos)
 	c.Conversations.Write(convos)
 	_ = c.repo.DeleteAllConversations()
-	_ = c.repo.SaveConversations(convos...) // ignore the error
+	_ = c.repo.SaveConversations(convos...)
 }

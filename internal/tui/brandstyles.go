@@ -375,6 +375,12 @@ var ( // Update Profile Form Styles
 					Faint(true).
 					Italic(true).
 					SetString("Account settings updated successfully!")
+
+	logoutPromptStyle = updateProfileFormSuccessStyle.
+				Foreground(dangerDarkColor).
+				Faint(false).
+				Italic(false).
+				SetString("Login to another account,")
 )
 
 var ( // Bunny Stying
