@@ -24,7 +24,9 @@ type LoginModel struct {
 	dangerState  bool // we turn the form to dangerColor
 	errMsg       errMsg
 	ev           *domain.ErrValidation
+	redirected   bool
 	client       *client.Client
+	tcm          TabContainerModel
 }
 
 type InActiveUser struct{}
@@ -83,7 +85,9 @@ func (m LoginModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.errMsg.err = ""
 		switch msg.String() {
 		case "ctrl+c":
-			return m, tea.Quit
+			mainModel := InitialTabContainerModel()
+			return mainModel, mainModel.Init()
+			//return m, tea.Quit
 		case "enter":
 			s := msg.String()
 			if s == "enter" {
@@ -157,7 +161,9 @@ func (m LoginModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case doneMsg:
 		m.spin = false
 		mainModel := InitialTabContainerModel()
-		return mainModel, mainModel.Init()
+		return mainModel, tea.Batch(mainModel.Init(), func() tea.Msg {
+			return tea.WindowSizeMsg{Width: terminalWidth, Height: terminalHeight}
+		})
 	}
 	// as the user focuses the input fields we reset the placeholders to defaults
 	for i := range m.txtInputs {
@@ -166,6 +172,7 @@ func (m LoginModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.txtInputs[i].PlaceholderStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#555555"))
 		}
 	}
+
 	return m, m.handleTxtInputs(msg)
 }
 

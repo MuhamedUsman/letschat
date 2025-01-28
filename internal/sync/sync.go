@@ -71,7 +71,7 @@ func (b *Broadcaster[T]) Broadcast(shtdwnCtx context.Context) {
 			}
 			b.mu.RUnlock()
 		case <-shtdwnCtx.Done():
-			b.wg.Wait()
+			//log.Printf("Returning From broadcasting for %v", reflect.TypeOf(b).String())
 			return
 		}
 	}

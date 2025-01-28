@@ -153,8 +153,8 @@ func (m ConversationModel) Update(msg tea.Msg) (ConversationModel, tea.Cmd) {
 				m.selConvoItemIdx = m.conversationList.Index()
 			}
 			return m, nil
-		/*case "ctrl+f":
-		return m, tea.Batch(m.conversationList.FilterInput.Focus(), m.handleConversationListUpdate(msg))*/
+		case "ctrl+f":
+			return m, tea.Batch(m.conversationList.FilterInput.Focus(), m.handleConversationListUpdate(msg))
 		case "ctrl+t":
 			m.conversationList.FilterInput.Blur()
 		case "ctrl+s":
@@ -244,7 +244,7 @@ func (m ConversationModel) Update(msg tea.Msg) (ConversationModel, tea.Cmd) {
 			cmds[1] = m.conversationList.InsertItem(0, populateConvoItem(0, m.selDiscUserConvo, false))
 		}
 		return m, tea.Batch(
-			tea.Sequence(cmds...),
+			//tea.Sequence(cmds...),
 			spinnerResetCmd,
 			m.getConversations(), // to continue the loop
 			m.conversationList.NewStatusMessage("Updated Conversations"),

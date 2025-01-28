@@ -129,8 +129,14 @@ func (m TabContainerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case requireAuthMsg:
+		// telling the WsConnStateListener to Idle when user is logging in
+		m.client.WsConnState.Write(client.Idle)
 		// must unsubscribe before redirecting to some other model
 		m.unsubBroadcasts()
+		// clear any selected chat for view
+		selUserID = ""
+		selUserTyping = false
+		selUsername = ""
 		loginModel := InitialLoginModel()
 		return loginModel, loginModel.Init()
 

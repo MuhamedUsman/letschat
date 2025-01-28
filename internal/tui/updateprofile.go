@@ -511,7 +511,7 @@ func (m *UpdateProfileModel) updateUser() tea.Cmd {
 func (m UpdateProfileModel) logout() tea.Cmd {
 	return func() tea.Msg {
 		if err := m.client.Logout(); err != nil {
-			return errMsg{err: err.Error()}
+			return &errMsg{err: err.Error(), code: 0}
 		}
 		return nil
 	}

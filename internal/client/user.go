@@ -107,6 +107,17 @@ func (c *Client) Login(u domain.UserAuth) error {
 	}
 	// signal an authenticated user
 	c.LoginState.Write(true)
+	// telling the WsConnStateListener the user is currently disconnected, so it can attempt a connection
+	c.WsConnState.Write(Connecting)
+	return nil
+}
+
+func (c *Client) Logout() error {
+	if err := c.krm.removeAuthTokenFromKeyring(); err != nil {
+		slog.Error(err.Error())
+		return err
+	}
+	c.LoginState.Write(false)
 	return nil
 }
 
@@ -298,13 +309,4 @@ func (c *Client) manageUserLogins(shtdwnCtx context.Context) {
 			slog.Error("unable to save current user to local repo", "err", err.Error())
 		}
 	}
-}
-
-func (c *Client) Logout() error {
-	if err := c.krm.removeAuthTokenFromKeyring(); err != nil {
-		slog.Error(err.Error())
-		return err
-	}
-	c.LoginState.Write(false)
-	return nil
 }

@@ -7,6 +7,7 @@ import (
 	"github.com/M0hammadUsman/letschat/internal/client/repository"
 	"github.com/M0hammadUsman/letschat/internal/common"
 	"github.com/M0hammadUsman/letschat/internal/domain"
+	"github.com/coder/websocket"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -40,6 +41,7 @@ type Client struct {
 	// will be called from main method after there is write on RunningTui chan from tui.TabContainerModel
 	// initialized in Init func
 	RunStartupProcesses func()
+	wsConn              *websocket.Conn
 	// talks to the api for managing native os based credential manager
 	krm      *keyringManager
 	sentMsgs sentMsgs

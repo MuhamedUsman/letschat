@@ -19,6 +19,7 @@ type WsConnState int
 
 const (
 	Disconnected WsConnState = iota - 1
+	Idle
 	WaitingForConnection
 	Connecting
 	Connected
@@ -41,16 +42,21 @@ func (c *Client) wsConnectAndListenForMessages(shtdwnCtx context.Context) {
 		HTTPHeader:      h,
 	}
 	conn, r, err := websocket.Dial(context.Background(), subscribeTo, opts)
+	c.wsConn = conn
 	if err != nil {
 		if r != nil && r.StatusCode == http.StatusUnauthorized {
 			c.LoginState.Write(false)
 		}
-		c.WsConnState.Write(Disconnected)
+		if c.LoginState.Get() {
+			c.WsConnState.Write(Disconnected)
+		}
 		return
 	}
 	defer conn.CloseNow()
 	if r.StatusCode != http.StatusSwitchingProtocols {
-		c.WsConnState.Write(Disconnected)
+		if c.LoginState.Get() {
+			c.WsConnState.Write(Disconnected)
+		}
 		return
 	}
 	c.WsConnState.Write(Connected)
@@ -58,7 +64,7 @@ func (c *Client) wsConnectAndListenForMessages(shtdwnCtx context.Context) {
 	go func() { errChan <- c.handleSentMessages(conn, shtdwnCtx) }()
 	go func() { errChan <- c.handleReceiveMessages(conn, shtdwnCtx) }()
 	if err = <-errChan; err != nil {
-		if shtdwnCtx.Err() == nil { // In case the shtdwnCtx is canceled we do not signal a Disconnect
+		if shtdwnCtx.Err() == nil && c.LoginState.Get() { // In case the shtdwnCtx is canceled we do not signal a Disconnect
 			c.WsConnState.Write(Disconnected)
 		}
 		if websocket.CloseStatus(err) == websocket.StatusNormalClosure ||
@@ -70,7 +76,6 @@ func (c *Client) wsConnectAndListenForMessages(shtdwnCtx context.Context) {
 			}
 			return
 		}
-		slog.Error(err.Error())
 	}
 	conn.Close(websocket.StatusNormalClosure, "client exited letschat")
 }
@@ -121,6 +126,12 @@ func (c *Client) attemptWsReconnectOnDisconnect(shtdwnCtx context.Context) {
 			switch s {
 			case Disconnected:
 				c.WsConnState.Write(WaitingForConnection)
+			case Idle:
+				if c.wsConn != nil {
+					c.wsConn.CloseNow()
+				}
+				attempt = 0
+				// do nothing, will be the case when user is logging in or signing up
 			case WaitingForConnection:
 				// After 5th retry
 				if attempt == maxAttempts {
