@@ -33,8 +33,8 @@ type InActiveUser struct{}
 
 func InitialLoginModel() LoginModel {
 	s := spinner.New()
-	s.Style = lipgloss.NewStyle().Foreground(whiteColor)
-	s.Spinner = spinner.Monkey
+	s.Style = lipgloss.NewStyle().Foreground(primaryContrastColor)
+	s.Spinner = spinner.Meter
 
 	m := LoginModel{
 		txtInputs: make([]textinput.Model, 2),
@@ -85,9 +85,7 @@ func (m LoginModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.errMsg.err = ""
 		switch msg.String() {
 		case "ctrl+c":
-			mainModel := InitialTabContainerModel()
-			return mainModel, mainModel.Init()
-			//return m, tea.Quit
+			return m, tea.Quit
 		case "enter":
 			s := msg.String()
 			if s == "enter" {

@@ -542,13 +542,13 @@ func (m *ChatViewportModel) handleMsgDialogViewportUpdate(msg tea.Msg) tea.Cmd {
 func (m ChatViewportModel) listenForMessages() tea.Cmd {
 	return func() tea.Msg {
 		for {
-			msg := <-m.mb.ch
-			if msg == nil {
+			if msg, ok := <-m.mb.ch; ok {
+				// if the msg has to do something with the selected chat then
+				if msg.SenderID == selUserID || msg.ReceiverID == selUserID {
+					return msg
+				}
+			} else {
 				return nil
-			}
-			// if the msg has to do something with the selected chat then
-			if msg.SenderID == selUserID || msg.ReceiverID == selUserID {
-				return msg
 			}
 		}
 	}

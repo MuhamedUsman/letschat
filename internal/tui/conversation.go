@@ -412,11 +412,10 @@ func (m *ConversationModel) updateConversationWindowSize() {
 
 func (m ConversationModel) getConversations() tea.Cmd {
 	return func() tea.Msg {
-		for {
-			if convos, ok := <-m.cb.ch; ok {
-				return convos
-			}
+		if convos, ok := <-m.cb.ch; ok {
+			return convos
 		}
+		return nil
 	}
 }
 

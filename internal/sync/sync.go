@@ -2,6 +2,8 @@ package sync
 
 import (
 	"context"
+	"log/slog"
+	"reflect"
 	"sync"
 )
 
@@ -34,7 +36,7 @@ func (b *Broadcaster[T]) Get() T {
 }
 
 func (b *Broadcaster[T]) Subscribe() (int, <-chan T) {
-	c := make(chan T, 1)
+	c := make(chan T)
 	b.mu.Lock()
 	token := b.next
 	b.out[token] = c
@@ -50,6 +52,8 @@ func (b *Broadcaster[T]) Unsubscribe(token int) {
 		close(ch)
 		delete(b.out, token)
 		b.wg.Done()
+	} else {
+		slog.Error("channel not found while unsubscribing", "type", reflect.TypeOf(b), "token", token)
 	}
 	b.mu.Unlock()
 }
@@ -71,7 +75,6 @@ func (b *Broadcaster[T]) Broadcast(shtdwnCtx context.Context) {
 			}
 			b.mu.RUnlock()
 		case <-shtdwnCtx.Done():
-			//log.Printf("Returning From broadcasting for %v", reflect.TypeOf(b).String())
 			return
 		}
 	}

@@ -29,8 +29,8 @@ type UserRegisterModel struct {
 
 func InitialUserRegisterModel() UserRegisterModel {
 	s := spinner.New()
-	s.Style = lipgloss.NewStyle().Foreground(whiteColor)
-	s.Spinner = spinner.Monkey
+	s.Style = lipgloss.NewStyle().Foreground(primaryContrastColor)
+	s.Spinner = spinner.Meter
 
 	m := UserRegisterModel{
 		txtInputs: make([]textinput.Model, 3),

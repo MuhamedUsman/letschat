@@ -69,15 +69,6 @@ func (m ChatModel) Update(msg tea.Msg) (ChatModel, tea.Cmd) {
 			typingCmd = m.chatTxtarea.Focus()
 			m.menuBtnIdx = -1
 			m.updateChatTxtareaAndViewportDimensions()
-		case "ctrl+s":
-			s := m.chatTxtarea.Value()
-			s = strings.TrimSpace(s)
-			validMsgForSend = s != ""
-			if !validMsgForSend {
-				return m, nil
-			}
-			m.chatTxtarea.Reset()
-			return m, tea.Batch(m.sendMessage(s), m.handleChatTextareaUpdate(msg), m.handleChatViewportUpdate(msg))
 		case "ctrl+o":
 			m.menuBtnIdx = 0
 		case "left":
@@ -99,6 +90,16 @@ func (m ChatModel) Update(msg tea.Msg) (ChatModel, tea.Cmd) {
 			m.chatTxtarea.Blur()
 			m.updateChatTxtareaAndViewportDimensions()
 		case "enter":
+			if m.chatTxtarea.Focused() {
+				s := m.chatTxtarea.Value()
+				s = strings.TrimSpace(s)
+				validMsgForSend = s != ""
+				if !validMsgForSend {
+					return m, nil
+				}
+				m.chatTxtarea.Reset()
+				return m, tea.Batch(m.sendMessage(s), m.handleChatTextareaUpdate(msg), m.handleChatViewportUpdate(msg))
+			}
 			switch m.menuBtnIdx {
 			case 0:
 				m.chatViewport.gotoFirstMsg = true
@@ -211,6 +212,7 @@ func newChatTxtArea() textarea.Model {
 	ta.CharLimit = 1000
 	ta.ShowLineNumbers = false
 	ta.SetHeight(0)
+	ta.KeyMap.InsertNewline.SetKeys("ctrl+n") // default: enter, but it will be used to send msg
 	ta.FocusedStyle.CursorLine = lipgloss.NewStyle()
 	ta.Cursor.Style = lipgloss.NewStyle().Foreground(primaryColor)
 	ta.FocusedStyle.Base = lipgloss.NewStyle().Foreground(whiteColor)

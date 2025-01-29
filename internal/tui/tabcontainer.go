@@ -48,6 +48,7 @@ func InitialTabContainerModel() TabContainerModel {
 	}
 	c := client.Get()
 	s := spinner.New(spinner.WithStyle(spinnerStyle), spinner.WithSpinner(spinner.Points))
+	token, ch := c.LoginState.Subscribe()
 	return TabContainerModel{
 		discover:    InitialDiscoverModel(c),
 		letschat:    InitialLetschatModel(c),
@@ -58,15 +59,15 @@ func InitialTabContainerModel() TabContainerModel {
 		stopwatch:   stopwatch.New(),
 		spinner:     &s,
 		client:      c,
+		lsb: LoginStateBroadcast{
+			ch:    ch,
+			token: token,
+		},
 	}
 }
 
 func (m TabContainerModel) Init() tea.Cmd {
-	token, ch := m.client.LoginState.Subscribe()
-	m.lsb = LoginStateBroadcast{
-		ch:    ch,
-		token: token,
-	}
+	//initializeBroadcasts()
 	return tea.Batch(
 		m.discover.Init(),
 		m.letschat.Init(),
