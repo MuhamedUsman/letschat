@@ -190,6 +190,8 @@ func (m ChatViewportModel) Update(msg tea.Msg) (ChatViewportModel, tea.Cmd) {
 				if m.selMsgDialogBtn == 2 {
 					return m, m.deleteForEveryone(*m.selMsgId)
 				}
+			} else {
+				m.chatVp.SetContent("")
 			}
 		}
 

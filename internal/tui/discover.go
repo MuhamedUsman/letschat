@@ -77,7 +77,7 @@ func (m DiscoverModel) Update(msg tea.Msg) (DiscoverModel, tea.Cmd) {
 			if m.focusIdx == 1 && m.focus {
 				selRow := m.table.SelectedRow()
 				selMsg := selDiscUserMsg{
-					id:    m.tableUsrIDs[m.table.Cursor()-1],
+					id:    m.tableUsrIDs[m.table.Cursor()],
 					name:  selRow[1],
 					email: selRow[2],
 				}

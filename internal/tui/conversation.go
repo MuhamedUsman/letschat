@@ -155,7 +155,7 @@ func (m ConversationModel) Update(msg tea.Msg) (ConversationModel, tea.Cmd) {
 				m.selConvoItemIdx = m.conversationList.Index()
 				// when the discovered user is set up in the conversationList it is not setup in the m.convos,
 				//that's why this check exists
-				if containsSelConvo(m.convos) && len(m.conversationList.Items()) > len(m.convos) {
+				if containsSelConvo(m.convos) && len(m.conversationList.Items()) > len(m.convos) && m.selConvoItemIdx > 0 {
 					m.selConvoItemIdx--
 				}
 				// once selected remove any unread msg count
