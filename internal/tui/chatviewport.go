@@ -190,8 +190,6 @@ func (m ChatViewportModel) Update(msg tea.Msg) (ChatViewportModel, tea.Cmd) {
 				if m.selMsgDialogBtn == 2 {
 					return m, m.deleteForEveryone(*m.selMsgId)
 				}
-			} else {
-				m.chatVp.SetContent("")
 			}
 		}
 
@@ -232,7 +230,7 @@ func (m ChatViewportModel) Update(msg tea.Msg) (ChatViewportModel, tea.Cmd) {
 
 	case msgPage:
 		m.fetching = false
-		m.msgs = append(m.msgs, msg.msgs...)
+		m.msgs = msg.msgs
 		m.currPage = msg.meta.CurrentPage
 		m.lastPage = msg.meta.LastPage
 		m.chatVp.SetContent(m.renderChatViewport())
