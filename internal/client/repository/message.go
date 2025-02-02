@@ -14,10 +14,9 @@ func NewLocalMessageRepository(db *DB) LocalMessageRepository {
 	return LocalMessageRepository{db}
 }
 
-type LatestMsgs map[string]*domain.LatestMsgBody
+type LatestMsgs map[string]*domain.ConvoDesc
 
 func (r LocalMessageRepository) GetLatestMsgBodyForConvos(cui ...string) (LatestMsgs, error) {
-	// cui convoUsrId
 	query := `
 		SELECT body, sent_at
 		FROM message
@@ -26,7 +25,7 @@ func (r LocalMessageRepository) GetLatestMsgBodyForConvos(cui ...string) (Latest
 	`
 	msgs := make(LatestMsgs, len(cui))
 	for _, id := range cui {
-		var msg domain.LatestMsgBody
+		var msg domain.ConvoDesc
 		var t string
 		if err := r.db.QueryRow(query, id).Scan(&msg.Body, &t); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
@@ -34,10 +33,30 @@ func (r LocalMessageRepository) GetLatestMsgBodyForConvos(cui ...string) (Latest
 			}
 			return nil, err
 		}
+		count, err := r.getUnreadMsgsCountForConvo(id)
+		if err != nil {
+			return nil, err
+		}
 		msg.SentAt, _ = parseTime(&t)
 		msgs[id] = &msg
+		msg.UnreadMsgsCount = count
 	}
 	return msgs, nil
+}
+
+type UnreadMsgsCount map[string]int64
+
+func (r LocalMessageRepository) getUnreadMsgsCountForConvo(convoId string) (int64, error) {
+	query := `
+		SELECT COUNT(*)
+		FROM message
+		WHERE sender_id = $1 AND message.read_at IS NULL
+	`
+	var msgCount int64
+	if err := r.db.QueryRow(query, convoId).Scan(&msgCount); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return 0, err
+	}
+	return msgCount, nil
 }
 
 func (r LocalMessageRepository) GetMsgByID(id string) (*domain.Message, error) {

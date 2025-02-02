@@ -48,10 +48,10 @@ type ConversationModel struct {
 	cb                  convosBroadcast
 }
 
-type conversationItem struct{ id, selConvoUsrId, title, status, latestMsg string }
+type conversationItem struct{ id, selConvoUsrId, title, unreadMsgsCount, status, latestMsg string }
 
 func (i conversationItem) Title() string {
-	return zone.Mark(i.id, fmt.Sprint(i.title, i.status))
+	return zone.Mark(i.id, fmt.Sprint(i.title, i.unreadMsgsCount, i.status))
 }
 func (i conversationItem) FilterValue() string {
 	return zone.Mark(i.id, fmt.Sprintf("%v|%v", i.title, i.selConvoUsrId))
@@ -107,6 +107,8 @@ func (m ConversationModel) Update(msg tea.Msg) (ConversationModel, tea.Cmd) {
 	if m.selDiscUserConvo != nil && m.selDiscUserConvo.UserID != selUserID {
 		m.selDiscUserConvo = nil
 		m.conversationList.RemoveItem(0)
+		m.conversationList.Select(m.selConvoItemIdx)
+		m.selConvoItemIdx--
 	}
 
 	// if the selUser has updated his/her username we need to update, this logic keep it in sync
@@ -151,10 +153,23 @@ func (m ConversationModel) Update(msg tea.Msg) (ConversationModel, tea.Cmd) {
 				selUserID = m.getSelConvoUsrID()
 				selUsername = m.getSelConvoUsername()
 				m.selConvoItemIdx = m.conversationList.Index()
+				// when the discovered user is set up in the conversationList it is not setup in the m.convos,
+				//that's why this check exists
+				if containsSelConvo(m.convos) && len(m.conversationList.Items()) > len(m.convos) {
+					m.selConvoItemIdx--
+				}
+				// once selected remove any unread msg count
+				if m.convos[m.selConvoItemIdx].UnreadMsgsCount > 0 {
+					m.convos[m.selConvoItemIdx].UnreadMsgsCount = 0
+					renderState := m.client.WsConnState.Get() == client.Connected
+					m.conversationList.SetItem(m.selConvoItemIdx, populateConvoItem(m.selConvoItemIdx, m.convos[m.selConvoItemIdx], renderState))
+				}
 			}
 			return m, nil
 		case "ctrl+f":
-			return m, tea.Batch(m.conversationList.FilterInput.Focus(), m.handleConversationListUpdate(msg))
+			if m.focus {
+				return m, tea.Batch(m.conversationList.FilterInput.Focus(), m.handleConversationListUpdate(msg))
+			}
 		case "ctrl+t":
 			m.conversationList.FilterInput.Blur()
 		case "ctrl+s":
@@ -225,6 +240,10 @@ func (m ConversationModel) Update(msg tea.Msg) (ConversationModel, tea.Cmd) {
 		}
 
 	case client.Convos:
+		// when conversation is selected, set the count of unread msgs to 0
+		if containsSelConvo(msg) {
+			msg[m.selConvoItemIdx].UnreadMsgsCount = 0
+		}
 		m.convos = msg
 		// e.g. if the conversation selected is not at the top, it will get to the top because of recent msg sent
 		// so we also need to change the selection marker accordingly
@@ -244,13 +263,20 @@ func (m ConversationModel) Update(msg tea.Msg) (ConversationModel, tea.Cmd) {
 			cmds[1] = m.conversationList.InsertItem(0, populateConvoItem(0, m.selDiscUserConvo, false))
 		}
 		return m, tea.Batch(
-			//tea.Sequence(cmds...),
+			tea.Sequence(cmds...),
 			spinnerResetCmd,
 			m.getConversations(), // to continue the loop
 			m.conversationList.NewStatusMessage("Updated Conversations"),
 		)
 
 	case selDiscUserMsg:
+		// there is previously discovered user set in the conversation list, we'll remove that before entering a new
+		if len(m.conversationList.Items()) > len(m.convos) {
+			m.selDiscUserConvo = nil
+			m.conversationList.RemoveItem(0)
+			m.conversationList.Select(m.selConvoItemIdx)
+			m.selConvoItemIdx--
+		}
 		items := m.conversationList.Items()
 		// if the selected user is already in the convo list
 		for i, item := range items {
@@ -272,8 +298,9 @@ func (m ConversationModel) Update(msg tea.Msg) (ConversationModel, tea.Cmd) {
 		m.selDiscUserConvo = convo
 		selUserID = msg.id
 		selUsername = msg.name
-		m.selConvoItemIdx = m.conversationList.Index()
 		cmd := m.conversationList.InsertItem(0, populateConvoItem(0, convo, false))
+		m.conversationList.Select(0)
+		m.selConvoItemIdx = m.conversationList.Index()
 		return m, cmd
 
 	}
@@ -383,9 +410,14 @@ func populateConvoItem(i int, convo *domain.Conversation, renderState bool) conv
 	if renderState {
 		s = renderStateInfo(convo)
 	}
-	widthBetweenUsernameAndStatus := conversationWidth() - (lipgloss.Width(convo.Username) + 5)
+	var count string
+	if convo.UnreadMsgsCount > 0 {
+		count = fmt.Sprintf(" %d*", convo.UnreadMsgsCount)
+		count = lipgloss.NewStyle().Foreground(greenColor).Render(count)
+	}
+	widthBetweenUsernameAndStatus := conversationWidth() - (lipgloss.Width(convo.Username) + lipgloss.Width(count) + 5)
 	s = lipgloss.NewStyle().Width(widthBetweenUsernameAndStatus).Align(lipgloss.Right).Render(s)
-	item := conversationItem{id, convo.UserID, convo.Username, s, latestMsg}
+	item := conversationItem{id, convo.UserID, convo.Username, count, s, latestMsg}
 	return item
 }
 
@@ -492,4 +524,13 @@ func calculateOnlineAgoTimestamp(lastOnline *time.Time) string {
 		return fmt.Sprintf("%vd%vh", int(days), intHrs)
 	}
 	return "💤"
+}
+
+func containsSelConvo(c client.Convos) bool {
+	return slices.ContainsFunc(c, func(c *domain.Conversation) bool {
+		if selUserID == c.UserID {
+			return true
+		}
+		return false
+	})
 }

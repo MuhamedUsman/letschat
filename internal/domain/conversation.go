@@ -17,6 +17,13 @@ type Conversation struct {
 	// latest msg to display under user's name in TUI, only used on frontend side
 	LatestMsg       *string    `json:"-"`
 	LatestMsgSentAt *time.Time `json:"-"`
+	UnreadMsgsCount int64      `json:"-"`
+}
+
+type ConvoDesc struct {
+	Body            *string    `db:"body"`
+	SentAt          *time.Time `db:"sent_at"`
+	UnreadMsgsCount int64      `db:"unread_msgs_count"`
 }
 
 type ConversationService interface {

@@ -60,6 +60,8 @@ func (m LetschatModel) Update(msg tea.Msg) (LetschatModel, tea.Cmd) {
 		case "ctrl+t":
 			m.chat.focus = true
 			m.conversation.focus = false
+		case "esc":
+			selUserID, selUsername, selUserTyping = "", "", false
 		}
 	}
 	return m, tea.Batch(m.handleConversationUpdate(msg), m.handleChatUpdate(msg))

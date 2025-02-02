@@ -38,7 +38,7 @@ compose/run:
 build/debug:
 	CGOENABLED=1; \
 	go build -gcflags "all=-N -l" -o ./bin ./cmd/letschat; \
-	dlv --listen=:2345 --headless=true --api-version=2 --accept-multiclient exec ./bin/letschat.exe
+	dlv --listen=:2345 --headless=true --api-version=2 --accept-multiclient exec ./bin/letschat.exe -- -usr 2
 
 # ==================================================================================== #
 # QUALITY CONTROL
@@ -62,6 +62,12 @@ audit:
 current_time = $(shell date --iso-8601=seconds)
 git_description = $(shell git describe --always --dirty --tags --long)
 linker_flags = '-s -w -X main.buildTime=${current_time} -X main.version=${git_description}'
+
+.PHONY: build/letschat
+build/letschat:
+	mkdir -p bin && \
+ 	go build -ldflags="-s -w" -trimpath -o bin/letschat.exe ./cmd/letschat && \
+ 	upx --best --lzma bin/letschat.exe
 
 .PHONY: build/letschat-api
 build/letschat-api:

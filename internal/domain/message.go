@@ -82,21 +82,3 @@ type MessageSent struct {
 	ReadAt      *time.Time   `json:"read_at"`
 	Operation   MsgOperation `json:"operation"`
 }
-
-type LatestMsgBody struct {
-	Body   *string    `db:"body"`
-	SentAt *time.Time `db:"sent_at"`
-}
-
-// TODO: Update this logic
-func (m MessageSent) ValidateMessageSent() *ErrValidation {
-	return nil
-}
-
-func ValidateMessageRcvrID(id string, ev *ErrValidation) {
-	ev.Evaluate(rgxUUID.MatchString(id), "receiverID", "Invalid receiver ID")
-}
-
-func ValidateMessageBody(body string, ev *ErrValidation) {
-	ev.Evaluate(len(body) <= 5120, "body", "must be a max of 5120 bytes (5KB) long")
-}
