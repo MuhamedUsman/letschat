@@ -119,17 +119,17 @@ func (m ConversationModel) Update(msg tea.Msg) (ConversationModel, tea.Cmd) {
 	if m.rerenderTimer.Timedout() {
 		m.rerenderTimer.Timeout = 10 * time.Second
 		m.rerenderTimer.Start()
-		var cmd []tea.Cmd
-		cmd = append(cmd, m.conversationList.SetItems(m.populateConvos()))
+		var cmds []tea.Cmd
+		cmds = append(cmds, m.conversationList.SetItems(m.populateConvos()))
 		if m.selDiscUserConvo != nil {
-			cmd = append(cmd, m.conversationList.InsertItem(0, populateConvoItem(0, m.selDiscUserConvo, false)))
+			cmds = append(cmds, m.conversationList.InsertItem(0, populateConvoItem(0, m.selDiscUserConvo, false)))
 		}
-		return m, tea.Batch(cmd...)
+		return m, tea.Batch(cmds...)
 	}
 
 	if m.resetSelectionTimer.Timedout() {
 		m.resetSelectionTimer.Timeout = 10 * time.Second
-		if m.selConvoItemIdx != m.conversationList.Index() {
+		if m.selConvoItemIdx != m.conversationList.Index() && m.conversationList.Index() < 0 {
 			m.conversationList.Select(m.selConvoItemIdx)
 		}
 		m.resetSelectionTimer.Start()
@@ -149,6 +149,7 @@ func (m ConversationModel) Update(msg tea.Msg) (ConversationModel, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "enter":
+			var cmd tea.Cmd
 			if m.focus {
 				selUserID = m.getSelConvoUsrID()
 				selUsername = m.getSelConvoUsername()
@@ -159,13 +160,12 @@ func (m ConversationModel) Update(msg tea.Msg) (ConversationModel, tea.Cmd) {
 					m.selConvoItemIdx--
 				}
 				// once selected remove any unread msg count
-				if m.convos[m.selConvoItemIdx].UnreadMsgsCount > 0 {
+				if len(m.convos) > 0 && m.convos[m.selConvoItemIdx].UnreadMsgsCount > 0 {
 					m.convos[m.selConvoItemIdx].UnreadMsgsCount = 0
-					renderState := m.client.WsConnState.Get() == client.Connected
-					m.conversationList.SetItem(m.selConvoItemIdx, populateConvoItem(m.selConvoItemIdx, m.convos[m.selConvoItemIdx], renderState))
+					m.rerenderTimer.Timeout = 0 // this will rerender the convos
 				}
 			}
-			return m, nil
+			return m, tea.Batch(m.handleConversationListUpdate(msg), cmd)
 		case "ctrl+f":
 			if m.focus {
 				return m, tea.Batch(m.conversationList.FilterInput.Focus(), m.handleConversationListUpdate(msg))
@@ -412,8 +412,9 @@ func populateConvoItem(i int, convo *domain.Conversation, renderState bool) conv
 	}
 	var count string
 	if convo.UnreadMsgsCount > 0 {
-		count = fmt.Sprintf(" %d*", convo.UnreadMsgsCount)
+		count = fmt.Sprintf(" %d⁕", convo.UnreadMsgsCount)
 		count = lipgloss.NewStyle().Foreground(greenColor).Render(count)
+		latestMsg = lipgloss.NewStyle().Foreground(primarySubtleDarkColor).Italic(true).Render(latestMsg)
 	}
 	widthBetweenUsernameAndStatus := conversationWidth() - (lipgloss.Width(convo.Username) + lipgloss.Width(count) + 5)
 	s = lipgloss.NewStyle().Width(widthBetweenUsernameAndStatus).Align(lipgloss.Right).Render(s)

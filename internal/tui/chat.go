@@ -174,12 +174,7 @@ func (m ChatModel) Update(msg tea.Msg) (ChatModel, tea.Cmd) {
 
 func (m ChatModel) View() string {
 	if selUsername == "" {
-		return chatContainerStyle.
-			Width(chatWidth()).
-			Height(chatHeight()).
-			Align(lipgloss.Center).
-			AlignVertical(lipgloss.Center).
-			Render(rabbit)
+		return lipgloss.Place(chatWidth(), chatHeight(), lipgloss.Center, lipgloss.Center, banner)
 	}
 	h := renderChatHeader(selUsername, selUserTyping)
 	if m.menuBtnIdx != -1 {

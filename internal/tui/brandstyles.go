@@ -391,7 +391,7 @@ var ( // Bunny Stying
 			Foreground(primaryColor).
 			Align(lipgloss.Center).
 			MarginTop(1).
-			Render(" Houston, we have a problem.\nNo results in this rabbit hole!")
+			Render(" Houston, we have a problem.\nNo results in this banner hole!")
 
 	bunny = lipgloss.NewStyle().
 		Foreground(bunnyColor).
@@ -418,20 +418,13 @@ var ( // Bunny Stying
 )
 
 var (
-	rabbit = lipgloss.NewStyle().
+	banner = lipgloss.NewStyle().
 		Foreground(primaryColor).
 		MarginTop(1).
 		Blink(true).
-		Render(r)
+		SetString(r).
+		Render(credits)
 
-	r = `
-      _........_
-   .d888888888888b.
-  d888+"""""+888888.
-   8b' o  o  '88888b
-_.8P (_)    .888888
-d88P .____, .d88888P
-888b.       :88888P'
-'"""""'-----'""""' mh
-`
+	r       = "    __         __            __          __ \n   / /   ___  / /___________/ /_  ____ _/ /_\n  / /   / _ \\/ __/ ___/ ___/ __ \\/ __ `/ __/\n / /___/  __/ /_(__  ) /__/ / / / /_/ / /_  \n/_____/\\___/\\__/____/\\___/_/ /_/\\__,_/\\__/  \n          "
+	credits = lipgloss.NewStyle().Italic(true).Render("Made with ♥️ by Muhammad Usman")
 )
