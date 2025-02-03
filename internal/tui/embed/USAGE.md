@@ -12,9 +12,11 @@
 - UP           ⇒  `↑` OR `K` OR `SCROLL UP`
 - DOWN         ⇒  `↓` OR `J` OR `SCROLL DOWN`
 - SELECT       ⇒  `ENTER` OR `LEFT CLICK ON NAME`
+- CLOSE CHAT   ⇒   `CTRL+X`
 ### CHATTING WINDOW
 - FOCUS TYPING ⇒  `CTRL+T` OR `HOVER`
-- SEND MSG     ⇒  `CTRL+S`
+- SEND MSG     ⇒  `ENTER`
+- NEWLINE      ⇒   `CTRL+N`
 - ⇏ DEL LINE   ⇒  `CTRL+K`
 - ⇍ DEL LINE   ⇒  `CTRL+U`
 - CHAT OPTIONS ⇒  `CTRL+O` OR `LEFT CLICK ⚙️`
