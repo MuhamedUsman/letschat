@@ -129,8 +129,12 @@ func (m ConversationModel) Update(msg tea.Msg) (ConversationModel, tea.Cmd) {
 
 	if m.resetSelectionTimer.Timedout() {
 		m.resetSelectionTimer.Timeout = 10 * time.Second
-		if m.selConvoItemIdx != m.conversationList.Index() && m.conversationList.Index() < 0 {
-			m.conversationList.Select(m.selConvoItemIdx)
+		if m.selConvoItemIdx != m.conversationList.Index() {
+			if m.selConvoItemIdx < 0 {
+				m.conversationList.Select(0)
+			} else {
+				m.conversationList.Select(m.selConvoItemIdx)
+			}
 		}
 		m.resetSelectionTimer.Start()
 	}
@@ -149,23 +153,12 @@ func (m ConversationModel) Update(msg tea.Msg) (ConversationModel, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "enter":
-			var cmd tea.Cmd
 			if m.focus {
 				selUserID = m.getSelConvoUsrID()
 				selUsername = m.getSelConvoUsername()
 				m.selConvoItemIdx = m.conversationList.Index()
-				// when the discovered user is set up in the conversationList it is not setup in the m.convos,
-				//that's why this check exists
-				if containsSelConvo(m.convos) && len(m.conversationList.Items()) > len(m.convos) && m.selConvoItemIdx > 0 {
-					m.selConvoItemIdx--
-				}
-				// once selected remove any unread msg count
-				if len(m.convos) > 0 && m.convos[m.selConvoItemIdx].UnreadMsgsCount > 0 {
-					m.convos[m.selConvoItemIdx].UnreadMsgsCount = 0
-					m.rerenderTimer.Timeout = 0 // this will rerender the convos
-				}
+				m.handleConvoItemSelection()
 			}
-			return m, tea.Batch(m.handleConversationListUpdate(msg), cmd)
 		case "ctrl+f":
 			if m.focus {
 				return m, tea.Batch(m.conversationList.FilterInput.Focus(), m.handleConversationListUpdate(msg))
@@ -208,9 +201,8 @@ func (m ConversationModel) Update(msg tea.Msg) (ConversationModel, tea.Cmd) {
 				if zone.Get(v.id).InBounds(msg) {
 					// If so, select it in the list.
 					m.conversationList.Select(i)
-					selUserID = m.getSelConvoUsrID()
-					selUsername = m.getSelConvoUsername()
 					m.selConvoItemIdx = i
+					m.handleConvoItemSelection()
 					break
 				}
 			}
@@ -435,6 +427,21 @@ func (m *ConversationModel) handleConversationListUpdate(msg tea.Msg) tea.Cmd {
 	var cmd tea.Cmd
 	m.conversationList, cmd = m.conversationList.Update(msg)
 	return cmd
+}
+
+func (m *ConversationModel) handleConvoItemSelection() {
+	selUserID = m.getSelConvoUsrID()
+	selUsername = m.getSelConvoUsername()
+	// when the discovered user is set up in the conversationList it is not setup in the m.convos,
+	//that's why this check exists
+	if containsSelConvo(m.convos) && len(m.conversationList.Items()) > len(m.convos) && m.selConvoItemIdx > 0 {
+		m.selConvoItemIdx--
+	}
+	// once selected remove any unread msg count
+	if len(m.convos) > 0 && m.convos[m.selConvoItemIdx].UnreadMsgsCount > 0 {
+		m.convos[m.selConvoItemIdx].UnreadMsgsCount = 0
+		m.rerenderTimer.Timeout = 0 // this will rerender the convos
+	}
 }
 
 func (m *ConversationModel) updateConversationWindowSize() {
