@@ -16,7 +16,7 @@
 ### CHATTING WINDOW
 - FOCUS TYPING ⇒  `CTRL+T` OR `HOVER`
 - SEND MSG     ⇒  `ENTER`
-- NEWLINE      ⇒   `CTRL+N`
+- NEWLINE      ⇒  `CTRL+N`
 - ⇏ DEL LINE   ⇒  `CTRL+K`
 - ⇍ DEL LINE   ⇒  `CTRL+U`
 - CHAT OPTIONS ⇒  `CTRL+O` OR `LEFT CLICK ⚙️`
