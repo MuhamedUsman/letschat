@@ -52,7 +52,7 @@ func (k *keyringManager) getAuthTokenFromKeyring() string {
 	if k.key == 1 {
 		return "7IQWKCP62SMPVEBXYTEPIYW5KM"
 	} else if k.key == 2 {
-		return "NEO4LI4TSUKTE7DTDVBKBC3DF4"
+		return "DT7OMUDGN4LSVIDQQPRGF4WWKQ"
 	}
 	return ""
 }

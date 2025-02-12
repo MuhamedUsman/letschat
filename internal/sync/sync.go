@@ -13,9 +13,9 @@ import (
 // Broadcast must be called in a separate long-running goroutine, this will not return even if there are no subscribers
 // to relay msgs to, Broadcast will only return once shutdown is initiated
 type Broadcaster[T any] struct {
-	in   chan T
-	mu   sync.RWMutex
-	wg   sync.WaitGroup
+	in chan T
+	sync.RWMutex
+	sync.WaitGroup
 	out  map[int]chan T
 	v    T
 	next int
@@ -24,38 +24,37 @@ type Broadcaster[T any] struct {
 func NewBroadcaster[T any]() *Broadcaster[T] {
 	return &Broadcaster[T]{
 		in:  make(chan T),
-		wg:  sync.WaitGroup{},
 		out: make(map[int]chan T),
 	}
 }
 
 func (b *Broadcaster[T]) Get() T {
-	b.mu.RLock()
-	defer b.mu.RUnlock()
+	b.RLock()
+	defer b.RUnlock()
 	return b.v
 }
 
 func (b *Broadcaster[T]) Subscribe() (int, <-chan T) {
 	c := make(chan T)
-	b.mu.Lock()
+	b.Lock()
 	token := b.next
 	b.out[token] = c
 	b.next++
-	b.wg.Add(1)
-	b.mu.Unlock()
+	b.Add(1)
+	b.Unlock()
 	return token, c
 }
 
 func (b *Broadcaster[T]) Unsubscribe(token int) {
-	b.mu.Lock()
+	b.Lock()
 	if ch, ok := b.out[token]; ok {
 		close(ch)
 		delete(b.out, token)
-		b.wg.Done()
+		b.Done()
 	} else {
 		slog.Error("channel not found while unsubscribing", "type", reflect.TypeOf(b), "token", token)
 	}
-	b.mu.Unlock()
+	b.Unlock()
 }
 
 func (b *Broadcaster[T]) Write(v T) {
@@ -67,13 +66,13 @@ func (b *Broadcaster[T]) Broadcast(shtdwnCtx context.Context) {
 		select {
 		case v := <-b.in:
 			b.v = v
-			b.mu.RLock() // reading from the map and writing to what we'll read, that's why RLock
+			b.RLock() // reading from the map and writing to what we'll read, that's why RLock
 			for _, ch := range b.out {
 				// this may block, but we want one on one synchronization
 				// if it blocks indefinitely, there is a problem elsewhere in the code
 				ch <- v
 			}
-			b.mu.RUnlock()
+			b.RUnlock()
 		case <-shtdwnCtx.Done():
 			return
 		}
