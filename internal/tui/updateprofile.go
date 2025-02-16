@@ -3,8 +3,8 @@ package tui
 import (
 	"errors"
 	"fmt"
-	"github.com/M0hammadUsman/letschat/internal/client"
-	"github.com/M0hammadUsman/letschat/internal/domain"
+	"github.com/MuhamedUsman/letschat/internal/client"
+	"github.com/MuhamedUsman/letschat/internal/domain"
 	"github.com/charmbracelet/bubbles/cursor"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"

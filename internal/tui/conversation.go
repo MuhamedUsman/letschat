@@ -2,8 +2,8 @@ package tui
 
 import (
 	"fmt"
-	"github.com/M0hammadUsman/letschat/internal/client"
-	"github.com/M0hammadUsman/letschat/internal/domain"
+	"github.com/MuhamedUsman/letschat/internal/client"
+	"github.com/MuhamedUsman/letschat/internal/domain"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/textinput"

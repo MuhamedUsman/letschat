@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/M0hammadUsman/letschat/internal/domain"
+	"github.com/MuhamedUsman/letschat/internal/domain"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jmoiron/sqlx"
 	"log/slog"

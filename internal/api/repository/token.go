@@ -2,7 +2,7 @@ package repository
 
 import (
 	"context"
-	"github.com/M0hammadUsman/letschat/internal/domain"
+	"github.com/MuhamedUsman/letschat/internal/domain"
 )
 
 var _ domain.TokenRepository = (*TokenRepository)(nil)

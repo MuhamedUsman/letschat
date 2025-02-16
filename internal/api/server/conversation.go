@@ -2,8 +2,8 @@ package server
 
 import (
 	"context"
-	"github.com/M0hammadUsman/letschat/internal/api/utility"
-	"github.com/M0hammadUsman/letschat/internal/domain"
+	"github.com/MuhamedUsman/letschat/internal/api/utility"
+	"github.com/MuhamedUsman/letschat/internal/domain"
 	"net/http"
 	"time"
 )

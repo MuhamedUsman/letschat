@@ -3,8 +3,8 @@ package client
 import (
 	"context"
 	"errors"
-	"github.com/M0hammadUsman/letschat/internal/domain"
-	"github.com/M0hammadUsman/letschat/internal/sync"
+	"github.com/MuhamedUsman/letschat/internal/domain"
+	"github.com/MuhamedUsman/letschat/internal/sync"
 	"github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
 	"log/slog"

@@ -3,7 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
-	"github.com/M0hammadUsman/letschat/internal/domain"
+	"github.com/MuhamedUsman/letschat/internal/domain"
 	"github.com/jmoiron/sqlx"
 )
 

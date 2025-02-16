@@ -2,7 +2,7 @@ package tui
 
 import (
 	"fmt"
-	"github.com/M0hammadUsman/letschat/internal/client"
+	"github.com/MuhamedUsman/letschat/internal/client"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/stopwatch"
 	"github.com/charmbracelet/bubbles/timer"

@@ -2,8 +2,8 @@ package main
 
 import (
 	"flag"
-	"github.com/M0hammadUsman/letschat/internal/client"
-	"github.com/M0hammadUsman/letschat/internal/tui"
+	"github.com/MuhamedUsman/letschat/internal/client"
+	"github.com/MuhamedUsman/letschat/internal/tui"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/lmittmann/tint"

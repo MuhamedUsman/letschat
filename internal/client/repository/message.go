@@ -3,7 +3,7 @@ package repository
 import (
 	"database/sql"
 	"errors"
-	"github.com/M0hammadUsman/letschat/internal/domain"
+	"github.com/MuhamedUsman/letschat/internal/domain"
 )
 
 type LocalMessageRepository struct {

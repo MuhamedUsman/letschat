@@ -3,7 +3,7 @@ package mailer
 import (
 	"bytes"
 	"embed"
-	"github.com/M0hammadUsman/letschat/internal/api/utility"
+	"github.com/MuhamedUsman/letschat/internal/api/utility"
 	"gopkg.in/gomail.v2"
 	"html/template"
 )

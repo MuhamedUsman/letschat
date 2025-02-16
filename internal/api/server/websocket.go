@@ -3,8 +3,8 @@ package server
 import (
 	"context"
 	"errors"
-	"github.com/M0hammadUsman/letschat/internal/api/utility"
-	"github.com/M0hammadUsman/letschat/internal/domain"
+	"github.com/MuhamedUsman/letschat/internal/api/utility"
+	"github.com/MuhamedUsman/letschat/internal/domain"
 	"github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
 	"io"

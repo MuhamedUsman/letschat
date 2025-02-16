@@ -1,7 +1,7 @@
 package tui
 
 import (
-	"github.com/M0hammadUsman/letschat/internal/client"
+	"github.com/MuhamedUsman/letschat/internal/client"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	zone "github.com/lrstanley/bubblezone"

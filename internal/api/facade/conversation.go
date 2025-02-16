@@ -2,8 +2,8 @@ package facade
 
 import (
 	"context"
-	"github.com/M0hammadUsman/letschat/internal/api/service"
-	"github.com/M0hammadUsman/letschat/internal/domain"
+	"github.com/MuhamedUsman/letschat/internal/api/service"
+	"github.com/MuhamedUsman/letschat/internal/domain"
 )
 
 type ConversationFacade struct {

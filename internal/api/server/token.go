@@ -2,7 +2,7 @@ package server
 
 import (
 	"errors"
-	"github.com/M0hammadUsman/letschat/internal/domain"
+	"github.com/MuhamedUsman/letschat/internal/domain"
 	"net/http"
 )
 

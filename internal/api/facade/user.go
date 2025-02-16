@@ -2,10 +2,10 @@ package facade
 
 import (
 	"context"
-	"github.com/M0hammadUsman/letschat/internal/api/mailer"
-	"github.com/M0hammadUsman/letschat/internal/api/service"
-	"github.com/M0hammadUsman/letschat/internal/common"
-	"github.com/M0hammadUsman/letschat/internal/domain"
+	"github.com/MuhamedUsman/letschat/internal/api/mailer"
+	"github.com/MuhamedUsman/letschat/internal/api/service"
+	"github.com/MuhamedUsman/letschat/internal/common"
+	"github.com/MuhamedUsman/letschat/internal/domain"
 	"log/slog"
 	"time"
 )

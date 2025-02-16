@@ -2,13 +2,13 @@ package main
 
 import (
 	"fmt"
-	"github.com/M0hammadUsman/letschat/internal/api/facade"
-	"github.com/M0hammadUsman/letschat/internal/api/mailer"
-	"github.com/M0hammadUsman/letschat/internal/api/repository"
-	"github.com/M0hammadUsman/letschat/internal/api/server"
-	"github.com/M0hammadUsman/letschat/internal/api/service"
-	"github.com/M0hammadUsman/letschat/internal/api/utility"
-	"github.com/M0hammadUsman/letschat/internal/common"
+	"github.com/MuhamedUsman/letschat/internal/api/facade"
+	"github.com/MuhamedUsman/letschat/internal/api/mailer"
+	"github.com/MuhamedUsman/letschat/internal/api/repository"
+	"github.com/MuhamedUsman/letschat/internal/api/server"
+	"github.com/MuhamedUsman/letschat/internal/api/service"
+	"github.com/MuhamedUsman/letschat/internal/api/utility"
+	"github.com/MuhamedUsman/letschat/internal/common"
 	"log/slog"
 	"os"
 )

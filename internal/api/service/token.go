@@ -6,7 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/base32"
 	"fmt"
-	"github.com/M0hammadUsman/letschat/internal/domain"
+	"github.com/MuhamedUsman/letschat/internal/domain"
 	"math/big"
 	"time"
 )

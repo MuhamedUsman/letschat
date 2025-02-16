@@ -1,7 +1,7 @@
 package tui
 
 import (
-	"github.com/M0hammadUsman/letschat/internal/tui/embed"
+	"github.com/MuhamedUsman/letschat/internal/tui/embed"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glamour"

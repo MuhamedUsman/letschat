@@ -2,7 +2,7 @@ package tui
 
 import (
 	"errors"
-	"github.com/M0hammadUsman/letschat/internal/domain"
+	"github.com/MuhamedUsman/letschat/internal/domain"
 	tea "github.com/charmbracelet/bubbletea"
 	"time"
 )

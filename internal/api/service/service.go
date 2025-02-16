@@ -1,7 +1,7 @@
 package service
 
 import (
-	"github.com/M0hammadUsman/letschat/internal/domain"
+	"github.com/MuhamedUsman/letschat/internal/domain"
 )
 
 type Service struct {
